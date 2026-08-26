@@ -65,14 +65,75 @@ describe("cursorRepoPathFromPayload", () => {
     expect(cursorRepoPathFromPayload(payload)).toBeUndefined();
   });
 
-  it("returns undefined for global hook event (no workspace_roots)", () => {
+  it("returns undefined for global hook event (workspace is the 'unknown' placeholder)", () => {
     const payload = makePayload({
       ingest_source: "cursor_hook",
       workspace: "unknown",
       workspace_scope: "global",
     });
-    // "unknown" is not a meaningful path — but the function returns it as-is
-    // (filtering "unknown" is handled upstream by git remote lookup returning null)
-    expect(cursorRepoPathFromPayload(payload)).toBe("unknown");
+    // "unknown" is not an absolute path. It used to be returned as-is and
+    // rejected downstream by git failing; it is now rejected here (AIX-547).
+    expect(cursorRepoPathFromPayload(payload)).toBeUndefined();
+  });
+});
+
+describe("cursorRepoPathFromPayload — normalization and traversal (AIX-547)", () => {
+  it("collapses .. segments instead of passing them to git -C", () => {
+    const payload = makePayload({ workspace_folder: "/Users/me/dev/proj/../../../../etc/evil" });
+    expect(cursorRepoPathFromPayload(payload)).toBe("/etc/evil");
+  });
+
+  it("returns undefined for a relative workspace path", () => {
+    const payload = makePayload({ workspace_folder: "dev/my-project" });
+    expect(cursorRepoPathFromPayload(payload)).toBeUndefined();
+  });
+
+  it("returns undefined for an option-shaped workspace path", () => {
+    const payload = makePayload({ workspace_folder: "--upload-pack=touch /tmp/pwn" });
+    expect(cursorRepoPathFromPayload(payload)).toBeUndefined();
+  });
+
+  it("returns undefined for a workspace path containing NUL", () => {
+    const payload = makePayload({ workspace_folder: "/Users/me/dev/proj\0/evil" });
+    expect(cursorRepoPathFromPayload(payload)).toBeUndefined();
+  });
+
+  it("trims surrounding whitespace", () => {
+    const payload = makePayload({ workspace_folder: "  /Users/me/dev/my-project  " });
+    expect(cursorRepoPathFromPayload(payload)).toBe("/Users/me/dev/my-project");
+  });
+
+  it("falls back to workspace when workspace_folder is unusable", () => {
+    const payload = makePayload({
+      workspace_folder: "--upload-pack=id",
+      workspace: "/Users/me/dev/fallback-project",
+    });
+    expect(cursorRepoPathFromPayload(payload)).toBe("/Users/me/dev/fallback-project");
+  });
+});
+
+describe("scopeDir containment end-to-end (AIX-547)", () => {
+  it("a traversal path escaping scopeDir is not treated as in-scope", async () => {
+    const { isRepoPathWithinRoot } = await import("../lib/repo-path-safety.js");
+    const scopeDir = "/Users/me/dev/my-project";
+    const payload = makePayload({
+      workspace_folder: `${scopeDir}/../../../../etc/evil`,
+    });
+
+    const ws = cursorRepoPathFromPayload(payload);
+    expect(ws).toBe("/etc/evil");
+    // The old check passed: "/Users/me/dev/my-project/../../../../etc/evil"
+    // .startsWith("/Users/me/dev/my-project/") === true.
+    expect(ws !== undefined && isRepoPathWithinRoot(ws, scopeDir)).toBe(false);
+  });
+
+  it("a legitimate subdirectory of scopeDir is still in scope", async () => {
+    const { isRepoPathWithinRoot } = await import("../lib/repo-path-safety.js");
+    const scopeDir = "/Users/me/dev/my-project";
+    const payload = makePayload({ workspace_folder: `${scopeDir}/packages/api` });
+
+    const ws = cursorRepoPathFromPayload(payload);
+    expect(ws).toBe(`${scopeDir}/packages/api`);
+    expect(ws !== undefined && isRepoPathWithinRoot(ws, scopeDir)).toBe(true);
   });
 });

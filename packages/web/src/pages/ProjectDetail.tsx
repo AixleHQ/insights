@@ -15,7 +15,6 @@ import { useOrg } from "@/contexts/OrgContext";
 import { useOrgNavGuard } from "@/hooks/useOrgNavGuard";
 
 import {
-  useProject,
   useDeleteProject,
   useProjectStats,
   useProjectDailyByTool,
@@ -25,6 +24,7 @@ import {
   useCurrentUser,
   type ProjectMember,
 } from "@/hooks/useApi";
+import { useProjectAccess } from "@/hooks/useProjectAccess";
 
 import { useProjectEventsTab } from "@/hooks/useProjectEventsTab";
 import { useFavorites } from "@/hooks/useFavorites";
@@ -128,7 +128,11 @@ export function ProjectDetail() {
   const granularity = timeRange === "1y" ? "month" : "day";
   const rangeLabel = TIME_RANGE_OPTIONS.find((o) => o.value === timeRange)?.label ?? "7 days";
 
-  const { data: project, isLoading: isLoadingProject } = useProject(id || "");
+  const {
+    project,
+    isLoading: isLoadingProject,
+    isAccessDenied,
+  } = useProjectAccess(id || "");
   const { data: projectMembers, isLoading: isLoadingMembers } = useProjectMembers(id || "");
   const { data: me } = useCurrentUser();
   const { data: projectStats, isLoading: isLoadingStats } = useProjectStats(id || "", selectedDays);
@@ -191,9 +195,10 @@ export function ProjectDetail() {
   const myProjectMembership = projectMembers?.find((m: ProjectMember) => m.userId === me?.id);
   const isProjectOwner = hasRole(["owner"]) || myProjectMembership?.role === "owner";
   const canManageMembers = hasRole(["owner"]);
-  // If the project loaded, the user has access (policy scope already enforces this).
   // Don't rely on the paginated members list to detect membership — it may not include
-  // the current user if the list is large and they appear on a later page.
+  // the current user if the list is large and they appear on a later page. Access itself
+  // is gated below by the query's error state (a 403/404 denies access), not by presence
+  // of possibly-stale cached project data.
   const isMemberOfProject = !!project;
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -243,7 +248,7 @@ export function ProjectDetail() {
     );
   }
 
-  if (!project) {
+  if (isAccessDenied || !project) {
     return <ProjectNotFound />;
   }
 

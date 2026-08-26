@@ -6,9 +6,9 @@ Runbook for cutting a public npm release of **`@aixle/insights`**. The package l
 
 - Member of the `@aixle` npm org with hardware 2FA enabled (FIDO2/WebAuthn — passkey or YubiKey).
 - Commit access to this repo.
-- **No long-lived npm token required.** Publishing uses OIDC Trusted Publishing (GitHub Actions OIDC). The `npm-publish` GitHub Environment must be configured with the intended reviewer(s).
+- **No long-lived npm token required.** Publishing uses OIDC Trusted Publishing (GitHub Actions OIDC). The `npm-publish` GitHub Environment currently has **no required reviewers** — checked live against `gh api repos/AixleHQ/insights/environments/npm-publish`, whose `protection_rules` contain only a `cli-mcp-v*` tag-pattern policy. Every publish, manual or automated, is unattended once tagged. (This corrects an earlier version of this doc that claimed a reviewer gate existed — it never did.)
 - `gh` CLI authenticated (`gh auth status` succeeds) for tag pushes via the terminal (optional if you use the GitHub UI).
-- Node.js must satisfy `@aixle/insights` engine requirements (`>=20`).
+- Node.js must satisfy `@aixle/insights` engine requirements (`>=20.19.0`).
 
 **Break-glass only** (if OIDC ever fails at npm Inc.'s side): create a short-lived Granular Access Token (90-day max) scoped to `@aixle/insights`, set as `NPM_TOKEN` in GitHub Secrets, then delete it immediately after the publish completes. Never store permanently.
 
@@ -75,6 +75,21 @@ For a release of `@aixle/insights@X.Y.Z`:
    vim packages/tools/aixle-insights/package.json   # set "version": "X.Y.Z"
    ```
 2. **Update the changelog** (`packages/tools/aixle-insights/CHANGELOG.md`): add a `## X.Y.Z` section with the dated release notes.
+2b. **Bring the package README current** (`packages/tools/aixle-insights/README.md`). This file *is* the npm landing page — it is the first and often only documentation a user reads, so a stale README ships as a defect. Confirm all of:
+   - Every command and flag the CLI accepts appears in the **Commands** table.
+   - Every environment variable the code reads appears in **Environment**, or is explicitly listed as internal.
+   - `config.json` keys and their precedence are accurate.
+   - Any behaviour change in this release is reflected — new defaults, renamed tools, changed hosts, new failure modes.
+   - The **Clean slate** procedure still names every artifact the package writes. **Breaking changes must extend it** with whatever a user has to remove to recover.
+
+   Quick audit — every name printed must appear in the README (or be listed there as internal). Note the pattern matches **both** `process.env.FOO` and `process.env["FOO"]`; matching only the dot form under-reports badly (3 instead of 12 at the time of writing):
+   ```bash
+   cd packages/tools/aixle-insights
+   grep -rhoE 'process\.env(\.[A-Z0-9_]+|\["[A-Z0-9_]+"\])' src --exclude-dir=test \
+     | grep -oE '[A-Z][A-Z0-9_]{2,}' | sort -u          # every env var read
+   grep -n 'command: "' src/cli.ts | head -1            # the command union
+   grep -oE '"--[a-z-]+"' src/cli.ts | sort -u          # every flag parsed
+   ```
 3. **Verify locally** from `packages/tools/`:
    ```bash
    cd packages/tools
@@ -100,7 +115,7 @@ For a release of `@aixle/insights@X.Y.Z`:
    git push origin cli-mcp-vX.Y.Z
    ```
 6. **Watch the workflow** (`.github/workflows/release-cli.yml` — "Release CLI to npm"). It:
-   - Pauses on the `npm-publish` GitHub Environment gate — a configured reviewer must approve before publish runs.
+   - Runs against the `npm-publish` GitHub Environment, whose only protection rule is the `cli-mcp-v*` tag policy — there is no reviewer approval step; the publish proceeds unattended once the guards below pass.
    - Matches tag version against `package.json` (and the `version` workflow_dispatch input).
    - Rejects placeholder + legacy scope literals (`@<scope>`, `@db90/telemetry-mcp`, `db90-telemetry-mcp`, `db90-mcp`) anywhere in the package source — straggler trap.
    - Rejects `file:` / `link:` dependency specs that cannot ship to the registry.
@@ -158,11 +173,22 @@ When a tag is not viable:
 
 Record the Actions run URL, outcome, `npm view` output, smoke-test result, elapsed time, and any Keycloak quirks in your PR description or completion notes.
 
+## Automated nightly builds (`.github/workflows/npm-nightly-builds.yml`)
+
+AIX-739. At most one build per day (`0 23 * * *` UTC = 20:00 Uruguay time), and **only for the `staging` channel** — see the channel bullet below; `stable` is manual-dispatch only. A run happens only when the branch actually has new package-relevant code since its last build; otherwise it no-ops. This is a **separate, lighter-weight path from everything above**, not a replacement for it:
+
+- **No CHANGELOG.md entry, no README currency audit, no evidence checklist.** Those stay mandatory only for a deliberate, human-cut release. An automated nightly build gets a GitHub Release instead, not a hand-written changelog section — see `packages/tools/aixle-insights/ARD.md` for why.
+- **Release notes are package-scoped, not repo-wide.** The body is built from `git log <previous same-channel tag>..<new tag>^` filtered to the resolver's `PACKAGE_PATHS`, deduped, and passed via `--notes`; `--generate-notes` is only a fallback if that yields nothing. Two consequences worth knowing when reading a release: unrelated api/web tickets no longer appear (they did before — `0.2.8-staging` listed AIX-627/-718/-699), and the range deliberately **excludes the tag's own synthetic version-bump commit**, so "Nightly build X" is not listed as a change.
+- **Version-bump commits are tag-only and never land on `develop` or `staging`.** The workflow commits the `package.json` bump locally, tags that commit, and pushes only the tag — the branch's own history is untouched. Don't be surprised if `package.json` on `develop`/`staging` looks "behind" the latest published version; the npm dist-tag is the source of truth, not the branch's checked-in version.
+- **A tag pushed by the workflow's bot token does not self-trigger this file.** GitHub suppresses workflow runs triggered by `GITHUB_TOKEN`-authored pushes (recursion guard). The nightly workflow explicitly dispatches this workflow via `gh workflow run --ref <tag>` instead, then polls for and follows the resulting run — the same guards below apply, unchanged.
+- **Only the `staging` channel is on the cron. `stable` is manual-dispatch only.** Validated live on 2026-08-19: `develop` trails `staging` by ~163 package-relevant commits, so an unattended daily stable publish would repeatedly ship a `latest` older than what QA has already validated on `staging`. Moving the production `latest` dist-tag therefore stays a deliberate human act (Actions → **NPM Auto Publish** → Run workflow → `channel: stable`, `dry_run: false`). Add `stable` to the cron only once `develop` genuinely reflects what should reach production. A failure opens a deduped GitHub issue (labeled by channel and failure phase) rather than failing silently; a post-publish smoke-test failure specifically includes a ready-to-run (never auto-run) `npm dist-tag add` rollback command.
+- To test manually without waiting for the cron: Actions → **NPM Auto Publish** → **Run workflow**, with `dry_run: true` (default) to see what it would do with zero mutation, or `dry_run: false` + a specific `channel` for a real, supervised run.
+
 ## If something goes wrong
 
 - **"Verify version matches package.json"** — tag (`cli-mcp-v…`) or `version` input mismatch; bump in a new commit and re-tag.
 - **Obsolete-scope guard** — a legacy `@db90/telemetry-mcp` / `db90-mcp` / `db90-telemetry-mcp` / `@<scope>` literal slipped into the package. Find and replace, then re-tag.
-- **Unauthorized lifecycle script guard** — only `prepublishOnly` is allowed. If a new lifecycle script is genuinely required, update the guard configuration accordingly.
+- **Unauthorized lifecycle script guard** — only `prepublishOnly` is allowed. If a new lifecycle script is genuinely required, update the guard *and* `packages/tools/aixle-insights/ARD.md` (§4 decision I) together.
 - **`publishConfig.provenance` guard** — `package.json` must keep `"publishConfig": { "access": "public", "provenance": false }` while the source repo is private. Flipping to `true` requires the source repo to be public first; npm returns HTTP 422 ("Unsupported GitHub Actions source repository visibility: private") otherwise.
 - **`npm audit signatures` failure** — a dep was unpublished + republished with a different signing identity, or registry signature drift. Investigate the failing dep on `npmjs.com` before disabling the check.
 - **Pack allowlist leaks** — fix `files` field / `.npmignore`; ensure stray artifacts are not staged.
@@ -180,5 +206,6 @@ Before marking a release ticket done:
 1. Tag pushed (`cli-mcp-v…`).
 2. GitHub Actions URL + green conclusion.
 3. `npm view @aixle/insights version` output matches the tag.
+3b. **README currency confirmed** (step 2b): commands, flags, environment variables, `config.json` and the Clean slate procedure all match the shipped code. State explicitly that it was checked — "no README change needed" is a valid answer, silence is not.
 4. Clean-profile `npx -y @aixle/insights init` narrative (issuer used, Claude config snippet, `aixle_insights_status` / health excerpt).
 5. Approximate elapsed time (≤ 5 min guideline).

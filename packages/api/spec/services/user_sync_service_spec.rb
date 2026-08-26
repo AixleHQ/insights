@@ -144,38 +144,64 @@ RSpec.describe UserSyncService do
     end
 
     context 'with auto-assign organization' do
-      let(:claims_acme) do
+      let(:claims_dbp) do
         {
-          'sub' => 'keycloak-acme-user',
+          'sub' => 'keycloak-dbp-user',
           'email' => 'user@example.com',
-          'name' => 'Acme User'
+          'name' => 'DBP User'
         }
       end
 
-      # Must match DOMAIN_ORG_MAPPING: 'example.com' => 'acme-corp'
-      let!(:acme_org) { create(:organization, slug: 'acme-corp', name: 'Acme Corp') }
+      # Must match DOMAIN_ORG_MAPPING: 'example.com' => 'dualboot-partners'
+      let!(:dbp_org) { create(:organization, slug: 'dualboot-partners', name: 'Acme Corp') }
 
       it 'auto-assigns user to organization based on email domain' do
-        user = described_class.sync_from_claims(claims_acme)
+        user = described_class.sync_from_claims(claims_dbp)
 
-        expect(user.organizations).to include(acme_org)
+        expect(user.organizations).to include(dbp_org)
       end
 
       it 'creates membership with member role' do
-        user = described_class.sync_from_claims(claims_acme)
+        user = described_class.sync_from_claims(claims_dbp)
 
-        membership = user.organization_memberships.find_by(organization: acme_org)
+        membership = user.organization_memberships.find_by(organization: dbp_org)
         expect(membership.role).to eq('member')
       end
 
       it 'does not create duplicate memberships' do
         # First sync
-        user = described_class.sync_from_claims(claims_acme)
+        user = described_class.sync_from_claims(claims_dbp)
 
         # Second sync
         expect {
-          described_class.sync_from_claims(claims_acme)
+          described_class.sync_from_claims(claims_dbp)
         }.not_to change(OrganizationMembership, :count)
+      end
+
+      it 'does not resurrect membership after the user left the org (AIX-611)' do
+        user = described_class.sync_from_claims(claims_dbp)
+        user.organization_memberships.find_by!(organization: dbp_org).destroy!
+
+        expect {
+          described_class.sync_from_claims(claims_dbp)
+        }.not_to change(OrganizationMembership, :count)
+
+        expect(user.reload.organizations).not_to include(dbp_org)
+      end
+
+      it 'does not domain-auto-join a pre-created (pending) user on first login (AIX-611)' do
+        # Administrate / seeds create the User row before Keycloak login. Linking
+        # keycloak_sub finds that record (not new_record?), so domain auto-join is
+        # skipped — org assignment remains an admin responsibility.
+        create(:user, email: 'user@example.com', keycloak_sub: 'pending-precreated')
+
+        expect {
+          described_class.sync_from_claims(claims_dbp)
+        }.not_to change(OrganizationMembership, :count)
+
+        user = User.find_by!(email: 'user@example.com')
+        expect(user.keycloak_sub).to eq('keycloak-dbp-user')
+        expect(user.organizations).not_to include(dbp_org)
       end
     end
 
@@ -216,6 +242,18 @@ RSpec.describe UserSyncService do
         expect {
           described_class.sync_from_claims(claims_project)
         }.not_to change(ProjectMembership, :count)
+      end
+
+      it 'does not resurrect project membership after leave (AIX-611)' do
+        user = described_class.sync_from_claims(claims_project)
+        user.organization_memberships.destroy_all
+        user.project_memberships.destroy_all
+
+        expect {
+          described_class.sync_from_claims(claims_project)
+        }.not_to change(ProjectMembership, :count)
+
+        expect(user.reload.projects).to be_empty
       end
 
       it 'handles no matching domain gracefully' do

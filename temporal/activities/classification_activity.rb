@@ -2,6 +2,7 @@
 
 require 'temporalio/activity'
 require 'json'
+require_relative 'sanitization_activity'
 
 module Activities
   class ClassificationActivity < Temporalio::Activity::Definition
@@ -34,6 +35,9 @@ module Activities
         }
       end
 
+      # Path 2: pre-scanned by the connector (@aixle/insights) — use result directly.
+      # requires_sanitization is always false: the connector has already processed
+      # its own content and the raw text is not available server-side to sanitize.
       if metadata["scannable"] == true && metadata["risk_level"]
         raw_level  = metadata["risk_level"]
         risk_level = VALID_RISK_LEVELS.include?(raw_level) ? raw_level : "low"
@@ -142,7 +146,7 @@ module Activities
       when Hash
         data.filter_map do |k, v|
           key = k.to_s
-          next if key == 'id' || key.end_with?('_id') || STRUCTURAL_KEYS.include?(key)
+          next if structural_key?(key)
 
           extract_text_from_hash(v, depth: depth + 1)
         end.join(' ')
@@ -153,6 +157,17 @@ module Activities
       else
         data.to_s
       end
+    end
+
+    # Structural identifiers are connector-generated correlation IDs, not user-authored
+    # text, so they must never be risk-scored as secrets (AIX-541). Kept in sync with
+    # SanitizationActivity::NON_CONTENT_KEYS so classify and sanitize agree on what counts
+    # as structural — see classify_sanitize_chain_spec.rb.
+    def structural_key?(key)
+      SanitizationActivity::NON_CONTENT_KEYS.include?(key) ||
+        key == 'id' ||
+        key.end_with?('_id') ||
+        STRUCTURAL_KEYS.include?(key)
     end
 
     def category_risk_weight(category)

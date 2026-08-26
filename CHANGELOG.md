@@ -5,6 +5,92 @@ All notable changes to Aixle Insights are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-08-26
+
+Second minor release after 1.1.0. Adds the member personal dashboard with
+Team/Personal tabs and team access for members, plus nightly npm build
+automation for `@aixle/insights`. Ships the security-headers + admin CSP
+hardening, and a batch of CLI/API/web fixes. No database migrations.
+
+### Added
+- Member personal dashboard: Team/Personal tabs, usage table with tool logos,
+  All Projects filter, and Team access for members like viewers
+  (`AIX-113`, `AIX-593`).
+- Nightly npm build automation for `@aixle/insights`: nightly-release resolve
+  logic and a build-orchestration workflow (`AIX-739`).
+
+### Changed
+- Add security headers middleware and a Content Security Policy for the admin
+  interface (`AIX-371`).
+
+### Fixed
+- Redact the OpenRouter webhook token from logs and Rollbar (`AIX-716`).
+- Guard the local Keycloak default against production hosts in the CLI
+  (`AIX-337`).
+- Show the selected time window for the Members list Events/Cost columns
+  (`AIX-583`).
+- Add a project-scope subtitle to the Usage by Tool/Model chart (`AIX-531`).
+- Replace remaining Aixle Insights branding in user-facing CLI copy (`AIX-624`).
+- Use a Textarea for the org description field to match Figma (`AIX-709`).
+- Restore the `w-48` default width on `ProjectFilterDropdown` (`AIX-114`).
+
+## [1.1.0] - 2026-08-18
+
+First minor release after 1.0.0. A large batch from `develop`: CLI/MCP
+(`@aixle/insights`) hardening and new telemetry, API auth and CORS hardening,
+leave-org access enforcement, and connector stuck-sync detection. One additive
+migration (`testing_started_at` on `organization_connectors`).
+
+### Added
+- Claude `tool_use` classify/summarize helpers and per-turn derivative payload
+  sync in the CLI (`AIX-259`).
+- Multi-org MCP init: resolve the default org on exchange or return an org
+  picker with remediations; surface the bound `organization_id` in
+  health/status (`AIX-606`).
+- Stable/Staging channel selector in the connect sheet, hidden on production
+  (`AIX-618`).
+- Cursor model resolution via `state.vscdb` fallback, stamped on daily-stats /
+  commit / transcript payloads (`AIX-540`).
+- `testing_started_at` timestamp on connectors for reliable stuck-sync
+  detection (`AIX-628`).
+- `eslint-plugin-security` lint gate and supply-chain audit fixes in the CLI
+  package (`AIX-559`).
+
+### Changed
+- Prefer the OS keychain over `credentials.json` and harden cross-OS credential
+  storage, including Windows fallback ACLs (`AIX-336`).
+- Enforce HTTPS end-to-end in the CLI (`postEvent`, `lookupProjectByRemote`),
+  threading an explicit `insecureHttpAllowed` opt-in (`AIX-539`).
+- Contain repo paths at the git spawn boundary and reject option-shaped
+  git/ssh argv (`AIX-546`, `AIX-547`).
+- Use per-turn Cursor transcript timestamps instead of a single batch time
+  (`AIX-605`).
+
+### Fixed
+- Harden API auth: scope CORS origins per environment and stop exposing the
+  Authorization header, reject ingest tokens from deactivated orgs, fail closed
+  on a missing webhook secret, and add CSRF state to the admin OAuth callback
+  (`AIX-369`).
+- Block former organization members (including global admins) from direct
+  project access and stop domain auto-join from resurrecting left orgs
+  (`AIX-611`).
+- Exempt `project_id`/`organization_id`/`user_id` from secret redaction and
+  unwrap double-encoded payloads before sanitizing (`AIX-541`).
+- Stop `invalid_json` from echoing secret content and log present-but-invalid
+  credential/config/state shapes (`AIX-699`).
+- Log security-relevant parse failures without warning when keytar is
+  unavailable (`AIX-558`).
+- Flag stale and stuck connectors in the health rollup while keeping
+  `last_sync_at` unchanged on reconnect (`AIX-628`).
+- Sort Top Users by event count with a stable tie-break and remove an N+1 in
+  the lookup (`AIX-613`).
+- Force stale tabs to reload on a new deploy, defer the service-worker reload
+  until no mutation is in flight, and infer the environment from `keycloakUrl`
+  when `APP_ENV` is unset (`AIX-610`).
+- Correct stale CLI paths and the MCP tool name in the setup copy
+  (`AIX-588`).
+- Fix a flaky audit-log spec on apostrophe names (`AIX-718`).
+
 ## [1.0.0] - 2026-08-05
 
 First stable release. Promotes the `1.0.0-alpha.*` series to a final `1.0.0`
@@ -332,13 +418,14 @@ tags cut from the same `release/1.0.0` branch.
 ### Added
 - Initial Aixle Insights platform release cut from `develop` for production infrastructure validation.
 
-[1.0.0]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0
-[1.0.0-alpha.9]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.9
-[1.0.0-alpha.8]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.8
-[1.0.0-alpha.7]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.7
-[1.0.0-alpha.6]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.6
-[1.0.0-alpha.5]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.5
-[1.0.0-alpha.4]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.4
-[1.0.0-alpha.3]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.3
-[1.0.0-alpha.2]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.2
-[1.0.0-alpha.1]: https://github.com/dualboot-partners/db90-rails/releases/tag/v1.0.0-alpha.1
+[1.1.0]: https://github.com/AixleHQ/insights/releases/tag/v1.1.0
+[1.0.0]: https://github.com/AixleHQ/insights/releases/tag/v1.0.0
+[1.0.0-alpha.9]: https://github.com/AixleHQ/insights/releases/tag/v1.0.0-alpha.9
+[1.0.0-alpha.8]: https://github.com/AixleHQ/insights/releases/tag/v1.0.0-alpha.8
+[1.0.0-alpha.7]: https://github.com/AixleHQ/insights/releases/tag/v1.0.0-alpha.7
+[1.0.0-alpha.6]: https://github.com/AixleHQ/insights/releases/tag/v1.0.0-alpha.6
+[1.0.0-alpha.5]: https://github.com/AixleHQ/insights/releases/tag/v1.0.0-alpha.5
+[1.0.0-alpha.4]: https://github.com/AixleHQ/insights/releases/tag/v1.0.0-alpha.4
+[1.0.0-alpha.3]: https://github.com/AixleHQ/insights/releases/tag/v1.0.0-alpha.3
+[1.0.0-alpha.2]: https://github.com/AixleHQ/insights/releases/tag/v1.0.0-alpha.2
+[1.0.0-alpha.1]: https://github.com/AixleHQ/insights/releases/tag/v1.0.0-alpha.1

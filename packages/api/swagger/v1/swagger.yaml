@@ -835,6 +835,7 @@ paths:
   /api/v1/organizations/{organization_id}/members:
     get:
       summary: List organization members
+      description: total_events, total_cost, and total_tokens are scoped to the days/all_time window below (defaults to the last 30 days), not all-time totals.
       tags:
         - Organization Members
       parameters:
@@ -847,6 +848,19 @@ paths:
           schema:
             type: string
             enum: [owner, member, viewer]
+        - name: days
+          in: query
+          description: Rolling window size in days for total_events/total_cost/total_tokens. Defaults to 30. Ignored when all_time is true.
+          schema:
+            type: integer
+            default: 30
+            minimum: 1
+            maximum: 730
+        - name: all_time
+          in: query
+          description: When true, aggregate total_events/total_cost/total_tokens over each member's entire history with no date bound. Overrides days.
+          schema:
+            type: boolean
       responses:
         '200':
           description: Members list
@@ -1524,6 +1538,26 @@ paths:
                           type: string
                         event_count:
                           type: integer
+                        tokens_in:
+                          type: integer
+                        tokens_out:
+                          type: integer
+                        cost_usd:
+                          type: number
+                          format: float
+                  model_breakdown:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        model:
+                          type: string
+                        event_count:
+                          type: integer
+                        tokens_in:
+                          type: integer
+                        tokens_out:
+                          type: integer
                         cost_usd:
                           type: number
                           format: float
@@ -1975,6 +2009,10 @@ paths:
                     properties:
                       summary:
                         type: object
+                        description: >-
+                          Status counts plus derived health overlays. stale, stuck, and healthy
+                          are overlays on the status counts (stale ⊆ connected, stuck ⊆ testing),
+                          not a partition — they do not sum to total.
                         properties:
                           total:
                             type: integer
@@ -1986,6 +2024,15 @@ paths:
                             type: integer
                           disconnected:
                             type: integer
+                          stale:
+                            type: integer
+                            description: Connected connectors whose last_sync_at exceeds the per-type expected interval.
+                          stuck:
+                            type: integer
+                            description: Connectors left in testing beyond the stuck timeout (wedged syncs).
+                          healthy:
+                            type: integer
+                            description: Connected connectors that are not stale.
                       connectors:
                         type: array
                         items:
@@ -2005,6 +2052,12 @@ paths:
                             last_error:
                               type: string
                               nullable: true
+                            stale:
+                              type: boolean
+                              description: True if a connected connector's last_sync_at exceeds its expected interval.
+                            stuck:
+                              type: boolean
+                              description: True if the connector has been in testing beyond the stuck timeout.
                             success_rate_7d:
                               type: number
                               format: float
@@ -2337,6 +2390,12 @@ paths:
                     format: float
                     nullable: true
                     description: Null when all_time=true
+                  total_tokens_in:
+                    type: integer
+                    description: Sum of input tokens in the reporting period
+                  total_tokens_out:
+                    type: integer
+                    description: Sum of output tokens in the reporting period
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -2978,7 +3037,10 @@ paths:
   /api/v1/organizations/{organization_id}/stats/tools/{tool_name}/users:
     get:
       summary: Tool user breakdown
-      description: Returns top users by token consumption for a specific tool, sorted by totalTokens descending. Events without a user_id are excluded. Pass project_id to scope to a single project (or "none" for unattributed events).
+      description: >
+        Returns top users for a specific tool, sorted by eventCount descending
+        (ties broken by costUsd, then userId). Events without a user_id are excluded.
+        Pass project_id to scope to a single project (or "none" for unattributed events).
       tags:
         - Stats
       parameters:
@@ -3018,7 +3080,7 @@ paths:
             type: string
       responses:
         '200':
-          description: User breakdown sorted by totalTokens descending
+          description: User breakdown sorted by eventCount descending (ties broken by cost, then user id)
           content:
             application/json:
               schema:
@@ -4233,12 +4295,15 @@ paths:
       summary: List project audit logs
       description: >
         Returns paginated audit log entries for the project.
-        Accessible by project admins (owner/admin role on the project), org admins, and global admins.
+        Accessible by project admins (owner role on the project) and org owners
+        who are current members of the project's organization.
+        Global admins follow the same membership rules as everyone else (AIX-611);
+        without org/project membership the project is outside authorized_scope (404).
         Project members and viewers receive 403.
 
         **Role-based field visibility:**
-        - Org admins and global admins: all fields including `ipAddress` and `trackedChanges`
-        - Project admins (non-org-admin): `ipAddress` and `trackedChanges` are omitted from the response
+        - Org owners: all fields including `ipAddress` and `trackedChanges`
+        - Project admins (non-org-owner): `ipAddress` and `trackedChanges` are omitted from the response
         - Personal project owners: all fields included
       tags:
         - Project Audit Logs
@@ -5869,6 +5934,114 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /api/v1/webhooks/{provider}/{connector_id}:
+    post:
+      summary: Receive a provider webhook (GitHub, GitLab, Bitbucket, Jira, Linear)
+      description: |
+        Public endpoint that receives webhook deliveries from source-control and
+        project-management providers.
+
+        **Authentication is by HMAC signature only — never a Bearer JWT.** Real provider
+        deliveries do not carry a JWT, so this route is excluded from the mandatory
+        `JwtAuth` middleware check (`JwtAuth::EXCLUDED_PATTERNS`).
+
+        Verification **fails closed**: if the connector has no `webhook_secret`
+        configured, the request is rejected with `400 Missing signature`
+        (`message: "Missing webhook secret"`) rather than being processed unsigned.
+
+        Signature header and algorithm vary by provider:
+
+        | Provider | Header | Scheme |
+        |---|---|---|
+        | `github` | `X-Hub-Signature-256` | HMAC-SHA256 hex, `sha256=` prefix |
+        | `bitbucket`, `jira` | `X-Hub-Signature` | HMAC-SHA256 hex, `sha256=` prefix |
+        | `linear` | `Linear-Signature` | HMAC-SHA256 hex, no prefix |
+        | `gitlab` | `X-Gitlab-Token` | plain shared-secret comparison, not an HMAC |
+
+        The HMAC is computed over the exact raw request body.
+
+        On success the payload is stored, a `WebhookDelivery` row is created, and a
+        provider-specific sync job is enqueued.
+      tags:
+        - Webhooks
+      security: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          description: Connector type; must match the connector's own `connector_type`.
+          schema:
+            type: string
+            enum: [github, gitlab, bitbucket, jira, linear]
+        - name: connector_id
+          in: path
+          required: true
+          description: UUID of the `OrganizationConnector` receiving the delivery.
+          schema:
+            type: string
+            format: uuid
+        - name: X-GitHub-Event
+          in: header
+          required: false
+          description: GitHub event type; used to classify the delivery.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        description: Raw provider webhook payload. Signed verbatim — do not re-serialize.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Signature verified; payload stored and dispatched
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      received:
+                        type: boolean
+                        example: true
+                      event_type:
+                        type: string
+                        nullable: true
+                        example: issues
+                      workflow_id:
+                        type: string
+                        nullable: true
+        '400':
+          description: |
+            Missing signature header, no `webhook_secret` configured on the connector
+            (fail-closed), unknown provider, or provider/connector-type mismatch.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Signature present but invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: No connector matches `connector_id`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Signature verified but processing failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /api/v1/integrations/mcp/exchange:
     post:
       summary: Exchange Keycloak access token for MCP ingest token(s)
@@ -5876,8 +6049,10 @@ paths:
         Mints fresh `UserToolAccount` ingest token(s) for the JWT-authenticated user
         and the requested ingest tool(s). Accounts are scoped to one of the caller's
         organization memberships: use optional header **`X-Organization-ID`** to pick a
-        specific org the user belongs to; when that header is omitted, the exchange uses
-        the user's oldest membership (by `organization_memberships.created_at`). Call with
+        specific org the user belongs to; when that header is omitted, resolution depends
+        on membership count: a single-org user binds their sole org, a multi-org user binds
+        their `default_org_id` preference (web Preferences), and a multi-org user without a
+        valid preference receives `422 organization_selection_required` listing their orgs. Call with
         `Authorization: Bearer` carrying the Keycloak access token from RFC 8628 device
         authorization.
 
@@ -5934,7 +6109,7 @@ paths:
                 summary: Dual-token MCP install
                 value:
                   tools: [claude_code, cursor]
-                  device_label: db90-mcp
+                  device_label: aixle-insights
       responses:
         '201':
           description: Ingest token(s) minted
@@ -5985,7 +6160,32 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
         '422':
-          $ref: '#/components/responses/ValidationError'
+          description: |
+            Validation error (e.g. unsupported `tool_name`), OR
+            `organization_selection_required` — a multi-org caller omitted
+            `X-Organization-ID` and has no valid `default_org_id` preference.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ValidationError'
+                  - type: object
+                    properties:
+                      error:
+                        type: string
+                        enum: [organization_selection_required]
+                      message:
+                        type: string
+                      organizations:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: { type: string, format: uuid }
+                            name: { type: string }
+                            role: { type: string, enum: [owner, member, viewer] }
+                          required: [id, name, role]
+                    required: [error, message, organizations]
 
   # ============================================
   # INGEST ENDPOINT (ingest token auth)
@@ -5994,7 +6194,7 @@ paths:
     post:
       summary: Ingest a tool event
       description: |
-        Accepts a single tool-usage event from a CLI connector (`db90-claude`, `db90-cursor`).
+        Accepts a single tool-usage event from the `@aixle/insights` CLI connector (`tool_name` is `claude_code` or `cursor`).
         Authenticated with a per-`UserToolAccount` Bearer ingest token (not a Keycloak JWT).
 
         The endpoint also accepts raw Claude Code hook payloads (`PostToolUse` and `Stop`),
@@ -6069,6 +6269,33 @@ paths:
                 metadata:
                   type: object
                   additionalProperties: true
+                  description: Arbitrary tool-specific metadata. Claude tool-use events include the fields below.
+                  properties:
+                    cost_model:
+                      type: string
+                      enum: [token_count, derivative]
+                      description: >
+                        Claude chat parents use "token_count"; derivative tool-use children
+                        use "derivative" (cost_usd is 0, no tokens). Other tools may send
+                        different cost_model values (additionalProperties allows them).
+                    parent_session_id:
+                      type: string
+                      description: session_id of the parent Claude turn (present on derivative tool-use events).
+                    tool_use_id:
+                      type: string
+                      description: Anthropic tool_use block ID (present on derivative tool-use events).
+                    tool_name_inner:
+                      type: string
+                      description: Name of the tool called (e.g. "Edit", "Bash") on derivative events.
+                    summary:
+                      type: string
+                      description: One-line scrubbed summary of the tool_use (derivative events; max 256 chars).
+                    nav_tool_calls:
+                      type: integer
+                      description: Number of navigation/read-only tool calls in this turn (Read, Glob, Grep, LS).
+                    total_tool_calls:
+                      type: integer
+                      description: Total tool calls across all content blocks in this turn.
       responses:
         '202':
           description: Event accepted for processing
@@ -6735,7 +6962,8 @@ components:
       description: |
         Optional organization selector. On MCP token exchange, when present and the
         authenticated user belongs to that organization, ingest accounts are scoped to
-        that membership; when omitted, the exchange uses the user's oldest membership.
+        that membership; when omitted, resolution follows the default-org rule (single-org
+        binds; multi-org uses the `default_org_id` preference or returns 422).
       schema:
         type: string
         format: uuid
@@ -7218,7 +7446,9 @@ components:
       description: >
         Project-level audit log entry.
         `ipAddress`, `trackedChanges`, and `userAgent` are omitted (key absent, not null) for
-        project-admin callers who are not org admins. Org admins and global admins receive all fields.
+        project-admin callers who are not org owners. Org owners receive all fields.
+        Global admins do not get a special field bypass — visibility follows org ownership
+        for the project's organization (AIX-611).
       properties:
         id:
           type: string
@@ -7522,19 +7752,19 @@ components:
           properties:
             total_tokens:
               type: integer
-              description: Total tokens consumed by this member in the organization
+              description: Tokens consumed by this member in the organization, scoped to the days/all_time window (default last 30 days)
             total_events:
               type: integer
-              description: Total tool events generated by this member in the organization
+              description: Tool events generated by this member in the organization, scoped to the days/all_time window (default last 30 days)
             total_cost:
               type: number
               format: float
-              description: Total cost (USD) attributed to this member in the organization
+              description: Cost (USD) attributed to this member in the organization, scoped to the days/all_time window (default last 30 days)
             last_active_at:
               type: string
               format: date-time
               nullable: true
-              description: Most recent tool event time for this member within the organization (MAX(occurred_at)); null if no events
+              description: Most recent tool event time for this member within the organization (MAX(occurred_at)), all-time regardless of the days/all_time window; null if no events
             cli_connected:
               type: boolean
               description: True when the member has at least one active user_tool_account on their organization membership

@@ -8,10 +8,14 @@ let testDir: string;
 
 beforeEach(() => {
   testDir = mkdtempSync(join(tmpdir(), "db90-sdk-config-test-"));
+  // Point mcpLog at the sandbox: rejected-shape cases below now emit a warn (AIX-699), and
+  // without this the suite appends to the developer's real ~/.aixle-insights/mcp.log.
+  process.env.AIXLE_INSIGHTS_HOME = testDir;
 });
 
 afterEach(() => {
   rmSync(testDir, { recursive: true, force: true });
+  delete process.env.AIXLE_INSIGHTS_HOME;
 });
 
 describe("loadBaseConfig — happy path", () => {

@@ -96,7 +96,14 @@ async function getProjectResolutionForSync(
     return cachedProjectResolution.value;
   }
 
-  const result = await resolveProjectId(undefined, undefined, creds.host, token, false);
+  const result = await resolveProjectId(
+    undefined,
+    undefined,
+    creds.host,
+    token,
+    false,
+    creds.insecureHttpAllowed === true
+  );
   mcpLog.info(
     "project_attribution_resolved",
     { project_id: result.projectId, source: result.source },
@@ -162,11 +169,12 @@ async function syncNowHandler(input: unknown) {
 
 async function authenticateHandler(args: z.infer<typeof AUTHENTICATE_INPUT_SCHEMA>) {
   try {
-    const kc = (args.keycloakUrl?.trim() || defaultKeycloakIssuer()).trim();
+    const ingestHost = process.env["DB90_API_URL"]?.trim() || "http://localhost:3000";
+    const kc = (args.keycloakUrl?.trim() || defaultKeycloakIssuer(ingestHost)).trim();
     if (!kc) {
       return jsonContent({
         ok: false,
-        error: "keycloakUrl or KEYCLOAK_ISSUER / DB90_KEYCLOAK_ISSUER is required",
+        error: "keycloakUrl or KEYCLOAK_ISSUER / AIXLE_INSIGHTS_KEYCLOAK_ISSUER is required",
       });
     }
     const clientId = args.clientId?.trim() || defaultKeycloakClientId();

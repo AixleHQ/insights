@@ -90,13 +90,26 @@ RSpec.describe Api::V1::Integrations::McpController, type: :controller do
         expect(response).to have_http_status(:created)
       end
 
-      it "falls back to primary (oldest) membership when the header is absent" do
+      it "returns 422 organization_selection_required when the header is absent and no default is set" do
+        expect(Mcp::IngestTokenExchangeService).not_to receive(:call)
+
+        post :exchange, params: { tool_name: "claude_code" }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        parsed = JSON.parse(response.body)
+        expect(parsed["error"]).to eq("organization_selection_required")
+        expect(parsed["organizations"].map { |o| o["id"] })
+          .to contain_exactly(older_org.id.to_s, newer_org.id.to_s)
+      end
+
+      it "binds the default_org_id membership when the preference is set" do
+        UserSetting.set(two_org_user, "default_org_id", newer_org.id.to_s)
         result = Mcp::IngestTokenExchangeService::Result.new(
           http_status: :created,
-          body: { data: { ingestHost: "http://test.host", organizationId: older_org.id.to_s, accounts: {} } }
+          body: { data: { ingestHost: "http://test.host", organizationId: newer_org.id.to_s, accounts: {} } }
         )
         expect(Mcp::IngestTokenExchangeService).to receive(:call).with(
-          membership: older_membership,
+          membership: newer_membership,
           tool_name: "claude_code",
           tools: nil,
           ingest_host: "http://test.host"

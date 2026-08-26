@@ -44,6 +44,8 @@ RSpec.describe 'Api::V1::Stats', type: :request do
       expect(json_response[:risk_alerts]).to be_a(Integer)
       expect(json_response[:events_change_percent]).to be_a(Numeric)
       expect(json_response[:cost_change_percent]).to be_a(Numeric)
+      expect(json_response[:total_tokens_in]).to be_a(Integer)
+      expect(json_response[:total_tokens_out]).to be_a(Integer)
     end
 
     it 'scopes by project_id when provided' do
@@ -1038,16 +1040,103 @@ RSpec.describe 'Api::V1::Stats', type: :request do
       expect(entry).to have_key(:costUsd)
     end
 
-    it "sorts users by totalTokens descending" do
+    it "sorts users by eventCount descending" do
       travel_to(frozen_time) do
+        # Give user2 two extra cursor events so it outranks user by event count
+        # (3 vs 1), even though user has the higher token/cost totals.
+        2.times do
+          create(:tool_event, organization: organization, user: user2,
+                 tool_name: "cursor", tokens_in: 0, tokens_out: 0,
+                 cost_usd: 0.0, occurred_at: Time.current)
+        end
+
         authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/cursor/users",
                           user: user, organization: organization
       end
 
       expect_success
-      tokens = json_response[:users].map { |u| u[:totalTokens] }
-      expect(tokens).to eq(tokens.sort.reverse)
-      expect(json_response[:users].first[:userId]).to eq(user.id)
+      counts = json_response[:users].map { |u| u[:eventCount] }
+      expect(counts).to eq([ 3, 1 ])
+      expect(json_response[:users].first[:userId]).to eq(user2.id)
+    end
+
+    it "ranks the heaviest-event user first even when its own token count is zero" do
+      # Reproduces AIX-613: ordering by all-zero total_tokens yielded arbitrary
+      # order, sinking the heaviest user below lighter ones that still have tokens
+      # from the shared before-block fixtures.
+      heavy = create(:user)
+      travel_to(frozen_time) do
+        3.times do
+          create(:tool_event, organization: organization, user: heavy,
+                 tool_name: "cursor", tokens_in: 0, tokens_out: 0,
+                 cost_usd: 0.0, occurred_at: Time.current)
+        end
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/cursor/users",
+                          user: user, organization: organization
+      end
+
+      expect_success
+      expect(json_response[:users].first[:userId]).to eq(heavy.id)
+      expect(json_response[:users].first[:eventCount]).to eq(3)
+    end
+
+    context "when breaking event-count ties" do
+      it "orders deterministically by cost then user_id" do
+        # Two users with equal event counts must return in a stable order across requests.
+        tie_a = create(:user)
+        tie_b = create(:user)
+        travel_to(frozen_time) do
+          ToolEvent.where(organization: organization, tool_name: "cursor").delete_all
+
+          create(:tool_event, organization: organization, user: tie_a,
+                 tool_name: "cursor", tokens_in: 0, tokens_out: 0,
+                 cost_usd: 2.0, occurred_at: Time.current)
+          create(:tool_event, organization: organization, user: tie_b,
+                 tool_name: "cursor", tokens_in: 0, tokens_out: 0,
+                 cost_usd: 5.0, occurred_at: Time.current)
+
+          authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/cursor/users",
+                            user: user, organization: organization
+        end
+
+        expect_success
+        user_ids = json_response[:users].map { |u| u[:userId] }
+        # Equal event counts (1 each) → higher cost first.
+        expect(user_ids).to eq([ tie_b.id, tie_a.id ])
+      end
+    end
+
+    it "resolves user records without an N+1 query" do
+      count_user_queries = lambda do |extra_users|
+        travel_to(frozen_time) do
+          ToolEvent.where(organization: organization, tool_name: "cursor").delete_all
+          extra_users.times do
+            create(:tool_event, organization: organization, user: create(:user),
+                   tool_name: "cursor", tokens_in: 0, tokens_out: 0,
+                   cost_usd: 0.0, occurred_at: Time.current)
+          end
+
+          user_queries = 0
+          subscription = ActiveSupport::Notifications.subscribe("sql.active_record") do |*, payload|
+            user_queries += 1 if payload[:sql] =~ /\ASELECT.+FROM "users"/i
+          end
+
+          begin
+            authenticated_get "/api/v1/organizations/#{organization.id}/stats/tools/cursor/users",
+                              user: user, organization: organization,
+                              params: { limit: 100 }
+          ensure
+            ActiveSupport::Notifications.unsubscribe(subscription)
+          end
+
+          expect_success
+          user_queries
+        end
+      end
+
+      # Batched lookup: users SELECT count must not grow with the number of result rows.
+      expect(count_user_queries.call(2)).to eq(count_user_queries.call(8))
     end
 
     it "excludes events with null user_id" do

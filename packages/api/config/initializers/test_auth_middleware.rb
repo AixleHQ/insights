@@ -1,17 +1,29 @@
 # frozen_string_literal: true
 
-# Test authentication middleware that simulates JWT authentication
-# This is only loaded in the test environment
+# Test authentication middleware that simulates JWT authentication.
+#
+# Defense in depth: gated on BOTH Rails.env.test? AND an explicit ALLOW_TEST_AUTH_MIDDLEWARE
+# flag that is set only by spec/rails_helper.rb (never by any infra config — Dockerfile,
+# docker-compose.yml, ECS task def, CI YAML). Rails.env.test? alone can't be the only gate:
+# a deploy accidentally booted with RAILS_ENV=test would satisfy it, which is exactly the
+# threat this guards against. The second flag can only ever be set by this test suite's own
+# Ruby bootstrap code, not by any environment misconfiguration.
 
 if Rails.env.test?
   class TestJwtAuthMiddleware
     EXCLUDED_PATHS = [ "/admin" ].freeze
+
+    def self.enabled?
+      Rails.env.test? && ENV["ALLOW_TEST_AUTH_MIDDLEWARE"] == "1"
+    end
 
     def initialize(app)
       @app = app
     end
 
     def call(env)
+      return @app.call(env) unless self.class.enabled?
+
       # Skip for admin paths
       request_path = env["PATH_INFO"]
       if EXCLUDED_PATHS.any? { |path| request_path&.start_with?(path) }

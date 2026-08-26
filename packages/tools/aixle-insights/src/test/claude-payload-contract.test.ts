@@ -38,110 +38,117 @@ function makeTurn(overrides: Partial<ClaudeTranscriptTurn> = {}): ClaudeTranscri
     riskLevel: "low",
     riskScore: 0,
     riskCategories: [],
+    toolUses: [],
+    navToolCalls: 0,
+    totalToolCalls: 0,
     ...overrides,
   };
+}
+
+function mapChat(turn: ClaudeTranscriptTurn, options?: Parameters<typeof mapTranscriptTurn>[1]) {
+  return mapTranscriptTurn(turn, options)[0]!;
 }
 
 describe("Claude MCP payload contract (AIX-192)", () => {
   describe("identity fields — must always be the literal values", () => {
     it("tool_name is literally 'claude_code'", () => {
-      const payload = mapTranscriptTurn(makeTurn());
+      const payload = mapChat(makeTurn());
       expect(payload.tool_name).toBe("claude_code");
     });
 
     it("event_type is literally 'chat'", () => {
-      const payload = mapTranscriptTurn(makeTurn());
+      const payload = mapChat(makeTurn());
       expect(payload.event_type).toBe("chat");
     });
 
     it("metadata.transcript_source is 'claude_jsonl' (lets server distinguish MCP path from hooks)", () => {
-      const payload = mapTranscriptTurn(makeTurn());
+      const payload = mapChat(makeTurn());
       expect(payload.metadata.transcript_source).toBe("claude_jsonl");
     });
   });
 
   describe("data-completeness — when input has the field, payload MUST carry it", () => {
     it("project_id is set when a projectId is resolved upstream", () => {
-      const payload = mapTranscriptTurn(makeTurn(), { projectId: "proj-uuid-Aixle Insights" });
+      const payload = mapChat(makeTurn(), { projectId: "proj-uuid-Aixle Insights" });
       expect(payload.project_id).toBe("proj-uuid-Aixle Insights");
     });
 
     it("model is set on the payload when the turn carries a model", () => {
-      const payload = mapTranscriptTurn(makeTurn({ model: "claude-opus-4-7" }));
+      const payload = mapChat(makeTurn({ model: "claude-opus-4-7" }));
       expect(payload.model).toBe("claude-opus-4-7");
     });
 
     it("model is also mirrored into metadata.model so server-side promotion works for backfills", () => {
-      const payload = mapTranscriptTurn(makeTurn({ model: "claude-opus-4-7" }));
+      const payload = mapChat(makeTurn({ model: "claude-opus-4-7" }));
       expect(payload.metadata.model).toBe("claude-opus-4-7");
     });
 
     it("tokens_in is set when tokensIn > 0", () => {
-      const payload = mapTranscriptTurn(makeTurn({ tokensIn: 100 }));
+      const payload = mapChat(makeTurn({ tokensIn: 100 }));
       expect(payload.tokens_in).toBe(100);
     });
 
     it("tokens_out is set when tokensOut > 0", () => {
-      const payload = mapTranscriptTurn(makeTurn({ tokensOut: 50 }));
+      const payload = mapChat(makeTurn({ tokensOut: 50 }));
       expect(payload.tokens_out).toBe(50);
     });
 
     it("tokens_total equals tokensIn + tokensOut when either is > 0", () => {
-      const payload = mapTranscriptTurn(makeTurn({ tokensIn: 100, tokensOut: 50 }));
+      const payload = mapChat(makeTurn({ tokensIn: 100, tokensOut: 50 }));
       expect(payload.tokens_total).toBe(150);
     });
 
     it("cost_usd is a positive number when model + tokens + pricing table are provided", () => {
-      const payload = mapTranscriptTurn(makeTurn(), { pricing: DEFAULT_PRICING });
+      const payload = mapChat(makeTurn(), { pricing: DEFAULT_PRICING });
       expect(payload.cost_usd).not.toBeNull();
       expect(payload.cost_usd as number).toBeGreaterThan(0);
     });
 
     it("cost_usd is null (not undefined, not omitted) when no pricing table is given — server will enrich", () => {
-      const payload = mapTranscriptTurn(makeTurn(), { pricing: undefined });
+      const payload = mapChat(makeTurn(), { pricing: undefined });
       expect(payload.cost_usd).toBeNull();
       expect("cost_usd" in payload).toBe(true);
     });
 
     it("metadata.scannable is true so the server runs prompt-text risk scanning", () => {
-      const payload = mapTranscriptTurn(makeTurn());
+      const payload = mapChat(makeTurn());
       expect(payload.metadata.scannable).toBe(true);
     });
 
     it("metadata.session_id is the turnId so server-side dedup keys correctly", () => {
-      const payload = mapTranscriptTurn(makeTurn({ turnId: "abc:42" }));
+      const payload = mapChat(makeTurn({ turnId: "abc:42" }));
       expect(payload.metadata.session_id).toBe("abc:42");
     });
   });
 
   describe("absence-completeness — when input lacks the field, payload MUST omit it (don't send null/0 as data)", () => {
     it("project_id is omitted when no projectId is provided", () => {
-      const payload = mapTranscriptTurn(makeTurn(), { projectId: undefined });
+      const payload = mapChat(makeTurn(), { projectId: undefined });
       expect(payload.project_id).toBeUndefined();
     });
 
     it("project_id is omitted when projectId is null", () => {
-      const payload = mapTranscriptTurn(makeTurn(), { projectId: null });
+      const payload = mapChat(makeTurn(), { projectId: null });
       expect(payload.project_id).toBeUndefined();
     });
 
     it("tokens_in is omitted when tokensIn is 0 (silent zeros would inflate the 'zero tokens' bucket on Events page)", () => {
-      const payload = mapTranscriptTurn(makeTurn({ tokensIn: 0, tokensOut: 5 }));
+      const payload = mapChat(makeTurn({ tokensIn: 0, tokensOut: 5 }));
       expect(payload.tokens_in).toBeUndefined();
     });
 
     it("tokens_out is omitted when tokensOut is 0", () => {
-      const payload = mapTranscriptTurn(makeTurn({ tokensIn: 5, tokensOut: 0 }));
+      const payload = mapChat(makeTurn({ tokensIn: 5, tokensOut: 0 }));
       expect(payload.tokens_out).toBeUndefined();
     });
 
     it("tokens_total is omitted when both tokensIn and tokensOut are 0", () => {
-      const payload = mapTranscriptTurn(makeTurn({ tokensIn: 0, tokensOut: 0 }));
+      const payload = mapChat(makeTurn({ tokensIn: 0, tokensOut: 0 }));
       expect(payload.tokens_total).toBeUndefined();
     });
 
     it("model is omitted when the turn has no model (and metadata.model is null, not a stale value)", () => {
-      const payload = mapTranscriptTurn(makeTurn({ model: "" }));
+      const payload = mapChat(makeTurn({ model: "" }));
       expect(payload.model).toBeUndefined();
       expect(payload.metadata.model).toBe("");
     });
@@ -149,21 +156,21 @@ describe("Claude MCP payload contract (AIX-192)", () => {
 
   describe("cache-token math — cost calculator must split base-input from cache reads", () => {
     it("base_input_tokens deducts cache_write and cache_read from tokensIn", () => {
-      const payload = mapTranscriptTurn(
+      const payload = mapChat(
         makeTurn({ tokensIn: 100, cacheWriteTokens: 20, cacheReadTokens: 30 })
       );
       expect(payload.metadata.base_input_tokens).toBe(50);
     });
 
     it("base_input_tokens never goes negative (clamps at 0)", () => {
-      const payload = mapTranscriptTurn(
+      const payload = mapChat(
         makeTurn({ tokensIn: 10, cacheWriteTokens: 30, cacheReadTokens: 0 })
       );
       expect(payload.metadata.base_input_tokens).toBe(0);
     });
 
     it("tokens_in excludes cache tokens — reports only base input (AIX-350)", () => {
-      const payload = mapTranscriptTurn(
+      const payload = mapChat(
         makeTurn({ tokensIn: 1000, cacheWriteTokens: 200, cacheReadTokens: 500 })
       );
       // tokens_in should be baseInputTokens = 1000 - 200 - 500 = 300
@@ -171,7 +178,7 @@ describe("Claude MCP payload contract (AIX-192)", () => {
     });
 
     it("tokens_total excludes cache tokens from input side (AIX-350)", () => {
-      const payload = mapTranscriptTurn(
+      const payload = mapChat(
         makeTurn({ tokensIn: 1000, tokensOut: 400, cacheWriteTokens: 200, cacheReadTokens: 500 })
       );
       // tokens_total = baseInputTokens + tokensOut = 300 + 400 = 700
@@ -179,7 +186,7 @@ describe("Claude MCP payload contract (AIX-192)", () => {
     });
 
     it("tokens_in equals tokensIn when no cache is used (no regression)", () => {
-      const payload = mapTranscriptTurn(
+      const payload = mapChat(
         makeTurn({ tokensIn: 1000, cacheWriteTokens: 0, cacheReadTokens: 0 })
       );
       expect(payload.tokens_in).toBe(1000);
@@ -188,13 +195,13 @@ describe("Claude MCP payload contract (AIX-192)", () => {
 
   describe("regression scenarios from the 2026-06-07 staging investigation", () => {
     it("a turn from a developer working in their repo posts with tool_name=claude_code, model, tokens, cost, project_id — the full Aixle Insights row contract", () => {
-      const payload = mapTranscriptTurn(
+      const payload = mapChat(
         makeTurn({
           model: "claude-sonnet-4-6",
           tokensIn: 1500,
           tokensOut: 800,
         }),
-        { projectId: "db90-project-uuid", pricing: DEFAULT_PRICING }
+        { projectId: "aixle-project-uuid", pricing: DEFAULT_PRICING }
       );
 
       expect(payload).toMatchObject({
@@ -204,7 +211,7 @@ describe("Claude MCP payload contract (AIX-192)", () => {
         tokens_in: 1500,
         tokens_out: 800,
         tokens_total: 2300,
-        project_id: "db90-project-uuid",
+        project_id: "aixle-project-uuid",
       });
       expect(payload.cost_usd).not.toBeNull();
       expect(payload.cost_usd as number).toBeGreaterThan(0);
@@ -213,9 +220,9 @@ describe("Claude MCP payload contract (AIX-192)", () => {
     });
 
     it("a turn with zero usage still posts (rare but valid) — model present, tokens omitted, cost null", () => {
-      const payload = mapTranscriptTurn(
+      const payload = mapChat(
         makeTurn({ tokensIn: 0, tokensOut: 0 }),
-        { projectId: "db90-project-uuid", pricing: DEFAULT_PRICING }
+        { projectId: "aixle-project-uuid", pricing: DEFAULT_PRICING }
       );
 
       expect(payload.tool_name).toBe("claude_code");
@@ -226,7 +233,28 @@ describe("Claude MCP payload contract (AIX-192)", () => {
       expect(payload.tokens_total).toBeUndefined();
       // No tokens → no cost to calculate
       expect(payload.cost_usd).toBe(0);
-      expect(payload.project_id).toBe("db90-project-uuid");
+      expect(payload.project_id).toBe("aixle-project-uuid");
+    });
+  });
+
+  describe("derivative tool-use payloads", () => {
+    it("have cost 0, derivative cost model, no tokens, and unique session IDs", () => {
+      const payloads = mapTranscriptTurn(
+        makeTurn({
+          toolUses: [{ id: "tu1", name: "Edit", eventType: "edit", summary: "Edit: /x.rb" }],
+          totalToolCalls: 1,
+        })
+      );
+      expect(payloads).toHaveLength(2);
+      const child = payloads[1]!;
+      expect(child.event_type).toBe("edit");
+      expect(child.cost_usd).toBe(0);
+      expect(child.tokens_in).toBeUndefined();
+      expect(child.tokens_out).toBeUndefined();
+      expect(child.tokens_total).toBeUndefined();
+      expect(child.metadata.cost_model).toBe("derivative");
+      expect(child.metadata.parent_session_id).toBe(payloads[0]!.metadata.session_id);
+      expect(child.metadata.session_id).toBe(`${payloads[0]!.metadata.session_id}:tool:tu1`);
     });
   });
 });

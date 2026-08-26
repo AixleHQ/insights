@@ -24,6 +24,20 @@ module Api
     # config.time_zone = "Central Time (US & Canada)"
     # config.eager_load_paths << Rails.root.join("extras")
 
+    # OWASP A05-4 (AIX-371) — tighten Rails' default response headers.
+    # Rails already sets X-Content-Type-Options: nosniff and a strict Referrer-Policy
+    # by default (see ActionDispatch::Response.default_headers) — only X-Frame-Options
+    # and Permissions-Policy need changing/adding here.
+    #
+    # NOTE: Rails' own `config.permissions_policy` DSL emits the deprecated
+    # `Feature-Policy` header (see actionpack's action_dispatch/http/permissions_policy.rb —
+    # the class was renamed but the header name/format were not), which modern browsers
+    # no longer honor. Permissions-Policy is set as a static header below instead.
+    config.action_dispatch.default_headers["X-Frame-Options"] = "DENY"
+    config.action_dispatch.default_headers["Permissions-Policy"] =
+      "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), " \
+      "microphone=(), payment=(), usb=(), interest-cohort=()"
+
     # Only loads a smaller set of middleware suitable for API only apps.
     # Middleware like session, flash, cookies can be added back manually.
     # Skip views, helpers and assets when generating a new resource.
@@ -53,6 +67,15 @@ module Api
              end,
       expire_after: 1.day
     config.middleware.use ActionDispatch::Flash
+
+    # api_only mode also strips ActionDispatch::ContentSecurityPolicy::Middleware
+    # (see railties' default_middleware_stack.rb, gated by `unless config.api_only`).
+    # Without it, the `content_security_policy` DSL used by AdminContentSecurityPolicy
+    # (app/controllers/concerns/admin_content_security_policy.rb) only sets
+    # request.content_security_policy — nothing converts that into a real response
+    # header. Safe to register globally: it's a no-op for any controller that hasn't
+    # opted in via that concern, so JSON API responses are unaffected.
+    config.middleware.use ActionDispatch::ContentSecurityPolicy::Middleware
 
     # Use SQL format for schema to preserve raw SQL (TimescaleDB, custom types, etc.)
     config.active_record.schema_format = :sql

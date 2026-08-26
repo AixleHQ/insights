@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   resolveProjectId,
   resolveProjectIdForRepoPath,
@@ -19,7 +22,7 @@ import { execFileSync } from "node:child_process";
 const mockExecFileSync = vi.mocked(execFileSync);
 
 describe("resolveProjectId", () => {
-  const host = "https://app.db90.io";
+  const host = "https://app.insights.example.com";
   const token = "db90_testtoken";
 
   beforeEach(() => {
@@ -41,6 +44,28 @@ describe("resolveProjectId", () => {
     const result = await resolveProjectId("", "config-uuid", host, token, false);
     expect(result.projectId).toBe("config-uuid");
     expect(result.source).toBe("config");
+  });
+
+  it("passes allowInsecureHttp through to the underlying lookup", async () => {
+    mockExecFileSync.mockReturnValue("git@github.com:org/repo.git\n" as unknown as Buffer);
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: { project_id: "auto-uuid", name: "My Repo" } }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const result = await resolveProjectId(
+      undefined,
+      undefined,
+      "http://trusted-staging.example",
+      token,
+      false,
+      true
+    );
+
+    expect(result.projectId).toBe("auto-uuid");
+    expect(mockFetch).toHaveBeenCalled();
   });
 
   it("treats empty string flag as unset and falls through to none when no config", async () => {
@@ -120,22 +145,27 @@ describe("resolveProjectId", () => {
   });
 
   it("resolves project from an explicit repo path", async () => {
-    mockExecFileSync.mockReturnValue("git@github.com:org/repo.git\n" as unknown as Buffer);
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({ data: { project_id: "path-uuid", name: "Path Repo" } }),
-    });
-    vi.stubGlobal("fetch", mockFetch);
+    const repoDir = mkdtempSync(join(tmpdir(), "db90-pr-repo-"));
+    try {
+      mockExecFileSync.mockReturnValue("git@github.com:org/repo.git\n" as unknown as Buffer);
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: { project_id: "path-uuid", name: "Path Repo" } }),
+      });
+      vi.stubGlobal("fetch", mockFetch);
 
-    const result = await resolveProjectIdForRepoPath("/repos/right-project", host, token, false);
-    expect(result.projectId).toBe("path-uuid");
-    expect(result.source).toBe("auto-detect");
-    expect(mockExecFileSync).toHaveBeenCalledWith(
-      "git",
-      ["-C", "/repos/right-project", "remote", "get-url", "origin"],
-      expect.any(Object)
-    );
+      const result = await resolveProjectIdForRepoPath(repoDir, host, token, false);
+      expect(result.projectId).toBe("path-uuid");
+      expect(result.source).toBe("auto-detect");
+      expect(mockExecFileSync).toHaveBeenCalledWith(
+        "git",
+        ["-C", realpathSync(repoDir), "remote", "get-url", "origin"],
+        expect.any(Object)
+      );
+    } finally {
+      rmSync(repoDir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -162,8 +192,13 @@ describe("getGitRemote", () => {
   });
 
   it("returns trimmed remote URL for an explicit repo path", () => {
-    mockExecFileSync.mockReturnValue("git@github.com:org/repo.git\n" as unknown as Buffer);
-    expect(getGitRemoteForPath("/repos/right-project", false)).toBe("git@github.com:org/repo.git");
+    const repoDir = mkdtempSync(join(tmpdir(), "db90-pr-repo-"));
+    try {
+      mockExecFileSync.mockReturnValue("git@github.com:org/repo.git\n" as unknown as Buffer);
+      expect(getGitRemoteForPath(repoDir, false)).toBe("git@github.com:org/repo.git");
+    } finally {
+      rmSync(repoDir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -233,7 +268,7 @@ describe("repoNameToGitRemoteCandidates", () => {
 });
 
 describe("lookupProjectByRepoName", () => {
-  const host = "https://app.db90.io";
+  const host = "https://app.insights.example.com";
   const token = "db90_testtoken";
 
   beforeEach(() => {
@@ -277,7 +312,7 @@ describe("lookupProjectByRepoName", () => {
 });
 
 describe("enrichCommitProjectAttribution", () => {
-  const host = "https://app.db90.io";
+  const host = "https://app.insights.example.com";
   const token = "db90_testtoken";
 
   beforeEach(() => {
@@ -341,7 +376,7 @@ describe("enrichCommitProjectAttribution", () => {
 });
 
 describe("lookupProjectByRemote", () => {
-  const host = "https://app.db90.io";
+  const host = "https://app.insights.example.com";
   const token = "db90_testtoken";
 
   beforeEach(() => {
@@ -401,9 +436,79 @@ describe("lookupProjectByRemote", () => {
     const mockFetch = vi.fn().mockResolvedValue({ ok: false, status: 404 });
     vi.stubGlobal("fetch", mockFetch);
 
-    await lookupProjectByRemote("git@github.com:org/repo.git", "https://app.db90.io/", token, false);
+    await lookupProjectByRemote("git@github.com:org/repo.git", "https://app.insights.example.com/", token, false);
     const calledUrl = mockFetch.mock.calls[0][0] as string;
     expect(calledUrl).toMatch(/^https:\/\/app\.db90\.io\/api\//);
     expect(calledUrl).not.toContain("//api");
+  });
+});
+
+describe("lookupProjectByRemote — transport security", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    // Restore the per-test console.error spy so its call history does not leak
+    // into sibling tests. vi.spyOn re-spying shares one spy across tests under
+    // vitest >= 4, so without this the loopback test sees the reject/warning
+    // calls from the two tests above and fails on `not.toHaveBeenCalled()`.
+    vi.restoreAllMocks();
+  });
+
+  it("rejects a remote http host and never calls fetch", async () => {
+    const mockFetch = vi.fn();
+    vi.stubGlobal("fetch", mockFetch);
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await lookupProjectByRemote(
+      "git@github.com:org/repo.git",
+      "http://attacker.example",
+      "tok",
+      false
+    );
+
+    expect(result).toBeNull();
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("attacker.example"));
+  });
+
+  it("allows a remote http host when allowInsecureHttp is true, with a warning", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ data: { project_id: "proj-uuid", name: "Test Project" } }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await lookupProjectByRemote(
+      "git@github.com:org/repo.git",
+      "http://trusted-staging.example",
+      "tok",
+      false,
+      true
+    );
+
+    expect(result).toEqual({ project_id: "proj-uuid", name: "Test Project" });
+    expect(mockFetch).toHaveBeenCalled();
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("Warning:"));
+  });
+
+  it("still allows loopback http with allowInsecureHttp defaulted to false", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({ ok: false, status: 404 });
+    vi.stubGlobal("fetch", mockFetch);
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await lookupProjectByRemote(
+      "git@github.com:org/repo.git",
+      "http://localhost:3000",
+      "tok",
+      false
+    );
+
+    expect(result).toBe("not-found");
+    expect(errSpy).not.toHaveBeenCalled();
   });
 });

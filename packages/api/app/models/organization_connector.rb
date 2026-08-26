@@ -4,6 +4,18 @@ class OrganizationConnector < ApplicationRecord
   STATUSES = %w[connected testing error disconnected].freeze
   SCOPES = %w[org project persona].freeze
 
+  # Max age of last_sync_at before a connected connector is considered stale.
+  # Types absent here are event-driven (source-control/PM webhooks, slack) with no
+  # sync schedule and are never flagged stale. Windows include grace over the cron
+  # cadence (AI ~4h, copilot/cursor daily). See AIX-628.
+  STALE_AFTER = {
+    "openrouter" => 8.hours, "anthropic" => 8.hours, "openai" => 8.hours, "gemini" => 8.hours,
+    "github_copilot" => 48.hours, "cursor" => 48.hours
+  }.freeze
+
+  # A connector left in `testing` longer than this is a wedged/abandoned sync.
+  STUCK_TESTING_AFTER = 1.hour
+
   # Scope is fixed per provider — not user-configurable.
   SCOPE_BY_TYPE = {
     "github" => "project", "gitlab" => "project", "bitbucket" => "project",
@@ -43,6 +55,22 @@ class OrganizationConnector < ApplicationRecord
   def token_expired?
     return false if token_expires_at.nil?
     token_expires_at < Time.current
+  end
+
+  def stale?
+    window = STALE_AFTER[connector_type]
+    return false if window.nil? || status != "connected"
+    return false if webhook_active? # webhook-driven ingest freezes last_sync_at legitimately
+    last_sync_at.nil? || last_sync_at < window.ago
+  end
+
+  def stuck?
+    return false unless status == "testing"
+    (testing_started_at || updated_at) < STUCK_TESTING_AFTER.ago
+  end
+
+  def healthy?
+    status == "connected" && !stale?
   end
 
   def multi_instance?
@@ -86,25 +114,28 @@ class OrganizationConnector < ApplicationRecord
   end
 
   def mark_testing!
-    update!(status: "testing", last_error: nil)
+    update!(status: "testing", last_error: nil, testing_started_at: Time.current)
   end
 
+  # Restores connected status after a credential check. Does NOT touch last_sync_at —
+  # only mark_synced! records a data sync. Otherwise a successful "Test connection"
+  # would clear staleness while usage data remains outdated (AIX-628).
   def mark_connected!
-    update!(status: "connected", last_error: nil, last_sync_at: Time.current, is_active: true)
+    update!(status: "connected", last_error: nil, is_active: true, testing_started_at: nil)
   end
 
   def mark_synced!(sync_started_at: nil)
-    update!(status: "connected", last_sync_at: Time.current, last_error: nil, is_active: true)
+    update!(status: "connected", last_sync_at: Time.current, last_error: nil, is_active: true, testing_started_at: nil)
     record_health_snapshot!("success", sync_started_at) if sync_started_at
   end
 
   def mark_error!(error_message, sync_started_at: nil)
-    update!(status: "error", last_error: error_message)
+    update!(status: "error", last_error: error_message, testing_started_at: nil)
     record_health_snapshot!("failure", sync_started_at, error_message: error_message) if sync_started_at
   end
 
   def mark_disconnected!
-    update!(status: "disconnected", is_active: false)
+    update!(status: "disconnected", is_active: false, testing_started_at: nil)
   end
 
   # Returns the tool_name used in ToolEvent for AI/Copilot billing sync, or nil otherwise.

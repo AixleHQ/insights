@@ -9,7 +9,12 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: "autoUpdate",
+      // "prompt" (not "autoUpdate"): autoUpdate reloads every open tab the
+      // instant a new SW activates with no way to intercept it, which can
+      // double-submit an in-flight non-idempotent mutation. "prompt" exposes
+      // an onNeedRefresh hook (see main.tsx) so we reload automatically but
+      // only once no mutation is in flight.
+      registerType: "prompt",
       includeAssets: ["favicon.svg", "icon-192.svg", "icon-512.svg", "icon-maskable.svg"],
       manifest: {
         name: "Aixle Insights - AI Tool Analytics",

@@ -110,6 +110,196 @@ RSpec.describe Activities::SanitizationActivity, type: :unit do
     end
   end
 
+  describe "AIX-541 — NON_CONTENT_KEYS exempts project_id/organization_id/user_id from secret redaction" do
+    let(:secrets_only_policy) do
+      {
+        "rules" => {
+          "secrets" => {
+            "enabled" => true,
+            "action" => "redact",
+            "patterns" => Activities::GetPolicyActivity::DEFAULT_POLICY["rules"]["secrets"]["patterns"]
+          }
+        }
+      }
+    end
+    let(:github_token) { "ghp_" + "A" * 36 }
+    let(:raw_payload) do
+      {
+        "organization_id" => "4a9c1e2b-6f3d-4e11-9c2a-7b8d5e6f9a10",
+        "user_id"         => "9d2f3a4b-5c6d-4e7f-8091-a2b3c4d5e6f7",
+        "project_id"      => "300373e4-b3de-42cf-8ffb-15e255ea1b78",
+        "metadata" => {
+          "prompt_text" => "npm publish failed, rotate token #{github_token}"
+        }
+      }
+    end
+
+    it "leaves project_id/organization_id/user_id UUIDs untouched while still redacting a real secret" do
+      result = activity.execute(
+        "raw_payload" => JSON.generate(raw_payload),
+        "policy" => secrets_only_policy,
+        "classification" => { "requires_sanitization" => true }
+      )
+
+      parsed = JSON.parse(result["sanitized_payload"])
+
+      expect(parsed["organization_id"]).to eq("4a9c1e2b-6f3d-4e11-9c2a-7b8d5e6f9a10")
+      expect(parsed["user_id"]).to eq("9d2f3a4b-5c6d-4e7f-8091-a2b3c4d5e6f7")
+      expect(parsed["project_id"]).to eq("300373e4-b3de-42cf-8ffb-15e255ea1b78")
+      expect(parsed.dig("metadata", "prompt_text")).to include("[REDACTED]")
+      expect(parsed.dig("metadata", "prompt_text")).not_to include(github_token)
+
+      redacted_paths = result["changes"].map { |c| c["path"] }
+      expect(redacted_paths).not_to include("project_id", "organization_id", "user_id")
+    end
+
+    it "does not redact a UUID pasted into free-text content (generic api_key net retired in AIX-579)" do
+      uuid = "300373e4-b3de-42cf-8ffb-15e255ea1b78"
+      payload = { "metadata" => { "commit_message" => "rotated secret, old value was #{uuid}" } }
+
+      result = activity.execute(
+        "raw_payload" => JSON.generate(payload),
+        "policy" => secrets_only_policy,
+        "classification" => { "requires_sanitization" => true }
+      )
+
+      parsed = JSON.parse(result["sanitized_payload"])
+      expect(parsed.dig("metadata", "commit_message")).to include(uuid)
+      expect(parsed.dig("metadata", "commit_message")).not_to include("[REDACTED]")
+    end
+
+    it "exempts a structural id field even under a custom policy pattern that matches its value" do
+      # DEFAULT_POLICY's anchored patterns never match a bare UUID, so the two tests
+      # above can't distinguish "exempt by key" from "exempt because nothing matched
+      # it anyway". This proves the guarantee is policy-independent: it holds even
+      # when a (non-default) policy pattern would otherwise match the id's value.
+      uuid_matching_policy = {
+        "rules" => {
+          "secrets" => {
+            "enabled" => true,
+            "action" => "redact",
+            "patterns" => {
+              "uuid_like" => '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+            }
+          }
+        }
+      }
+      project_id = "300373e4-b3de-42cf-8ffb-15e255ea1b78"
+      content_uuid = "9d2f3a4b-5c6d-4e7f-8091-a2b3c4d5e6f7"
+      payload = {
+        "project_id" => project_id,
+        "metadata" => { "commit_message" => "old value was #{content_uuid}" }
+      }
+
+      result = activity.execute(
+        "raw_payload" => JSON.generate(payload),
+        "policy" => uuid_matching_policy,
+        "classification" => { "requires_sanitization" => true }
+      )
+
+      parsed = JSON.parse(result["sanitized_payload"])
+      expect(parsed["project_id"]).to eq(project_id)
+      expect(parsed.dig("metadata", "commit_message")).to include("[REDACTED]")
+      expect(parsed.dig("metadata", "commit_message")).not_to include(content_uuid)
+
+      redacted_paths = result["changes"].map { |c| c["path"] }
+      expect(redacted_paths).to include("metadata.commit_message")
+      expect(redacted_paths).not_to include("project_id")
+    end
+  end
+
+  describe "AIX-541 — double-encoded payloads (no existing coverage on this branch)" do
+    let(:uuid_matching_policy) do
+      {
+        "rules" => {
+          "secrets" => {
+            "enabled" => true,
+            "action" => "redact",
+            "patterns" => {
+              "uuid_like" => '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
+            }
+          }
+        }
+      }
+    end
+    let(:project_id) { "300373e4-b3de-42cf-8ffb-15e255ea1b78" }
+    let(:content_uuid) { "9d2f3a4b-5c6d-4e7f-8091-a2b3c4d5e6f7" }
+
+    def deep_parse(str)
+      value = JSON.parse(str)
+      value = JSON.parse(value) while value.is_a?(String)
+      value
+    end
+
+    it "unwraps a double-encoded payload and still exempts structural ids" do
+      obj = { "project_id" => project_id, "metadata" => { "note" => "old #{content_uuid}" } }
+      double_encoded = JSON.generate(JSON.generate(obj))
+
+      result = activity.execute(
+        "raw_payload" => double_encoded,
+        "policy" => uuid_matching_policy,
+        "classification" => { "requires_sanitization" => true }
+      )
+
+      parsed = deep_parse(result["sanitized_payload"])
+      expect(parsed["project_id"]).to eq(project_id)
+      expect(parsed.dig("metadata", "note")).to include("[REDACTED]")
+      expect(parsed.dig("metadata", "note")).not_to include(content_uuid)
+    end
+
+    it "unwraps a triple-encoded payload" do
+      obj = { "project_id" => project_id, "metadata" => { "note" => "old #{content_uuid}" } }
+      triple_encoded = JSON.generate(JSON.generate(JSON.generate(obj)))
+
+      result = activity.execute(
+        "raw_payload" => triple_encoded,
+        "policy" => uuid_matching_policy,
+        "classification" => { "requires_sanitization" => true }
+      )
+
+      parsed = deep_parse(result["sanitized_payload"])
+      expect(parsed["project_id"]).to eq(project_id)
+      expect(parsed.dig("metadata", "note")).to include("[REDACTED]")
+    end
+
+    it "unwraps a double-encoded top-level array" do
+      raw = JSON.generate(JSON.generate([ { "user_id" => project_id, "note" => "old #{content_uuid}" } ]))
+
+      result = activity.execute(
+        "raw_payload" => raw,
+        "policy" => uuid_matching_policy,
+        "classification" => { "requires_sanitization" => true }
+      )
+
+      parsed = deep_parse(result["sanitized_payload"])
+      expect(parsed.first["user_id"]).to eq(project_id)
+      expect(parsed.first["note"]).to include("[REDACTED]")
+    end
+
+    it "falls back to flat-string scanning when the inner layer is plain text, not further JSON" do
+      raw = JSON.generate("secret #{content_uuid} here")
+
+      result = activity.execute(
+        "raw_payload" => raw,
+        "policy" => uuid_matching_policy,
+        "classification" => { "requires_sanitization" => true }
+      )
+
+      expect(result["sanitized_payload"]).to be_a(String)
+      expect(JSON.parse(result["sanitized_payload"])).to include("[REDACTED]")
+    end
+
+    it "returns an empty-string payload untouched (loop terminates, no crash)" do
+      result = activity.execute(
+        "raw_payload" => "",
+        "policy" => uuid_matching_policy,
+        "classification" => { "requires_sanitization" => true }
+      )
+
+      expect(result["sanitized_payload"]).to eq("")
+    end
+  end
+
   describe "AIX-263 QA — phone pattern widened to catch parenthesized/international formats" do
     let(:default_policy) do
       {

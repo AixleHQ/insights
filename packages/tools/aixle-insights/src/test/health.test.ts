@@ -26,7 +26,7 @@ describe("buildHealthSnapshot", () => {
   beforeEach(() => {
     home = mkdtempSync(join(tmpdir(), "db90-mcp-health-"));
     process.env.AIXLE_INSIGHTS_HOME = home;
-    process.env.DB90_MCP_DISABLE_KEYTAR = "true";
+    process.env.AIXLE_INSIGHTS_MCP_DISABLE_KEYTAR = "true";
     mkdirSync(home, { recursive: true });
     // Redirect homedir() to the sandbox so verifyHooksConfig() reads an
     // isolated ~/.cursor/hooks.json instead of the developer's real one.
@@ -39,7 +39,7 @@ describe("buildHealthSnapshot", () => {
 
   afterEach(() => {
     delete process.env.AIXLE_INSIGHTS_HOME;
-    delete process.env.DB90_MCP_DISABLE_KEYTAR;
+    delete process.env.AIXLE_INSIGHTS_MCP_DISABLE_KEYTAR;
     vi.doUnmock("node:os");
     vi.resetModules();
     vi.restoreAllMocks();
@@ -81,6 +81,30 @@ describe("buildHealthSnapshot", () => {
     expect(s.configured).toBe(true);
     expect(s.persisted?.recent_errors.join(" ")).toContain("persisted failure");
     expect(s.state_file_paths.some((p) => p.endsWith(".json"))).toBe(true);
+  });
+
+  it("surfaces organization_id from stored credentials", async () => {
+    const ORG_A = "11111111-2222-3333-4444-555555555555";
+    const host = "http://localhost:3000";
+    writeFileSync(
+      join(home, "credentials.json"),
+      JSON.stringify({
+        version: 2,
+        host,
+        organizationId: ORG_A,
+        accounts: { claude_code: "db90_test" },
+      }),
+      "utf-8"
+    );
+
+    vi.resetModules();
+    const { buildHealthSnapshot, healthSnapshotToStatusPayload, formatHealthForCli } =
+      await import("../health.js");
+    const snap = await buildHealthSnapshot();
+
+    expect(snap.organization_id).toBe(ORG_A);
+    expect(healthSnapshotToStatusPayload(snap).organization_id).toBe(ORG_A);
+    expect(formatHealthForCli(snap)).toContain(`organization_id: ${ORG_A}`);
   });
 
   it("reports hooks installation status and queue depth", async () => {

@@ -7,22 +7,25 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-// Shared project scope selector for the dashboard filter bar. Used by both the
-// Team (OrgDashboard) and Personal (MemberDashboard) tabs so the control style,
-// labeling, and placement stay identical when switching tabs (AIX-607).
+interface ProjectFilterDropdownProps {
+  orgId: string;
+  value: string | undefined;
+  onChange: (v: string | undefined) => void;
+  /** Label for the unscoped option — F4-S1 / Figma use "All Projects". */
+  allLabel?: string;
+  // w-48 keeps the trigger fixed-width so it doesn't jump when the selected
+  // project name changes length (introduced by AIX-607 fix).
+  className?: string;
+}
+
+
 export function ProjectFilterDropdown({
   orgId,
   value,
   onChange,
   allLabel = "All Projects",
   className = "w-48",
-}: {
-  orgId: string;
-  value: string | undefined;
-  onChange: (v: string | undefined) => void;
-  allLabel?: string;
-  className?: string;
-}) {
+}: ProjectFilterDropdownProps) {
   const { data: projects } = useProjects(orgId);
 
   return (

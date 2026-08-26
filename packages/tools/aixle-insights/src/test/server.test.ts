@@ -33,12 +33,12 @@ describe("MCP server (in-process)", () => {
     home = mkdtempSync(join(tmpdir(), "aixle-insights-home-"));
     mkdirSync(home, { recursive: true });
     process.env.AIXLE_INSIGHTS_HOME = home;
-    process.env.DB90_MCP_DISABLE_KEYTAR = "true";
+    process.env.AIXLE_INSIGHTS_MCP_DISABLE_KEYTAR = "true";
   });
 
   afterEach(() => {
     delete process.env.AIXLE_INSIGHTS_HOME;
-    delete process.env.DB90_MCP_DISABLE_KEYTAR;
+    delete process.env.AIXLE_INSIGHTS_MCP_DISABLE_KEYTAR;
     vi.restoreAllMocks();
   });
 
@@ -349,6 +349,55 @@ describe("MCP server (in-process)", () => {
         for (const call of syncMock.mock.calls) {
           expect(call[0].projectId).toBeNull();
         }
+      } finally {
+        await client.close();
+        await server.close();
+      }
+    });
+
+    it("passes insecureHttpAllowed from credentials.json through to resolveProjectId", async () => {
+      writeFileSync(
+        join(home, "credentials.json"),
+        JSON.stringify({
+          version: 2,
+          host: "http://trusted-staging.example",
+          accounts: { claude_code: "db90_test" },
+          insecureHttpAllowed: true,
+        }),
+        "utf-8"
+      );
+
+      vi.resetModules();
+      const resolveMock = vi.fn().mockResolvedValue({ projectId: null, source: "none" });
+      const syncMock = vi.fn().mockResolvedValue({ sent: 0, failed: 0, skipped: 0 });
+      vi.doMock("../lib/index.js", async () => {
+        const actual = await vi.importActual<typeof import("../lib/index.js")>("../lib/index.js");
+        return { ...actual, resolveProjectId: resolveMock };
+      });
+      vi.doMock("../sync.js", async () => {
+        const actual = await vi.importActual<typeof import("../sync.js")>("../sync.js");
+        return { ...actual, syncTelemetryTools: syncMock };
+      });
+
+      const { createAixleInsightsMcpServer } = await import("../server.js");
+      const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+      const { InMemoryTransport } = await import("@modelcontextprotocol/sdk/inMemory.js");
+
+      const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+      const server = createAixleInsightsMcpServer();
+      const client = new Client({ name: "db90-mcp-test-client", version: "0.0.0" });
+      await server.connect(serverTransport);
+      await client.connect(clientTransport);
+      try {
+        await client.callTool({ name: "aixle_insights_sync_now", arguments: {} });
+        expect(resolveMock).toHaveBeenCalledWith(
+          undefined,
+          undefined,
+          "http://trusted-staging.example",
+          "db90_test",
+          false,
+          true
+        );
       } finally {
         await client.close();
         await server.close();

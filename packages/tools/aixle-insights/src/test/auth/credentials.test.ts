@@ -2,7 +2,13 @@ import { mkdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { clearCredentials, loadCredentials, loadCredentialsFromFileOnly, saveCredentials } from "../../auth/credentials.js";
+import {
+  clearCredentials,
+  loadCredentials,
+  loadCredentialsFromFileOnly,
+  saveCredentials,
+  saveStoredCredentials,
+} from "../../auth/credentials.js";
 
 describe("auth/credentials", () => {
   let home: string;
@@ -11,13 +17,13 @@ describe("auth/credentials", () => {
     home = join(tmpdir(), `db90-mcp-cred-${Date.now()}-${Math.random().toString(16).slice(2)}`);
     mkdirSync(home, { recursive: true });
     process.env.AIXLE_INSIGHTS_HOME = home;
-    process.env.DB90_MCP_DISABLE_KEYTAR = "true";
+    process.env.AIXLE_INSIGHTS_MCP_DISABLE_KEYTAR = "true";
   });
 
   afterEach(async () => {
     await clearCredentials(home);
     delete process.env.AIXLE_INSIGHTS_HOME;
-    delete process.env.DB90_MCP_DISABLE_KEYTAR;
+    delete process.env.AIXLE_INSIGHTS_MCP_DISABLE_KEYTAR;
   });
 
   it("saveCredentials writes a credentials file with restrictive mode on POSIX", async () => {
@@ -52,5 +58,24 @@ describe("auth/credentials", () => {
       accounts: { claude_code: "db90_fallback" },
       host: "http://localhost:3000",
     });
+  });
+
+  it("round-trips insecureHttpAllowed when the caller opted in", async () => {
+    await saveStoredCredentials(
+      {
+        host: "http://staging.trusted.test",
+        accounts: { claude_code: "db90_insecure" },
+        insecureHttpAllowed: true,
+      },
+      home
+    );
+    const creds = await loadCredentials(home);
+    expect(creds?.insecureHttpAllowed).toBe(true);
+  });
+
+  it("omits insecureHttpAllowed when the caller never opted in", async () => {
+    await saveCredentials("db90_plain", "https://app.insights.example.com", home);
+    const creds = await loadCredentials(home);
+    expect(creds?.insecureHttpAllowed).toBeUndefined();
   });
 });

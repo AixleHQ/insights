@@ -154,6 +154,62 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
 
       expect_bad_request
     end
+
+    context 'with a member who has events older than 30 days' do
+      before do
+        create(:tool_event, organization: organization, user: member, cost_usd: 0.5, occurred_at: Time.current)
+        create(:tool_event, organization: organization, user: member, cost_usd: 1.0, occurred_at: 90.days.ago)
+      end
+
+      it 'excludes events outside the default 30-day window from total_events/total_cost' do
+        authenticated_get "/api/v1/organizations/#{organization.id}/members",
+                          user: member,
+                          organization: organization
+
+        expect_success
+        member_data = json_data.find { |m| m[:user][:email] == member.email }
+        expect(member_data[:total_events]).to eq(1)
+        expect(member_data[:total_cost]).to be_within(0.001).of(0.5)
+      end
+
+      it 'includes the older window when days is widened' do
+        authenticated_get "/api/v1/organizations/#{organization.id}/members",
+                          user: member,
+                          organization: organization,
+                          params: { days: 365 }
+
+        expect_success
+        member_data = json_data.find { |m| m[:user][:email] == member.email }
+        expect(member_data[:total_events]).to eq(2)
+        expect(member_data[:total_cost]).to be_within(0.001).of(1.5)
+      end
+
+      it 'aggregates the full history when all_time is true' do
+        authenticated_get "/api/v1/organizations/#{organization.id}/members",
+                          user: member,
+                          organization: organization,
+                          params: { all_time: true }
+
+        expect_success
+        member_data = json_data.find { |m| m[:user][:email] == member.email }
+        expect(member_data[:total_events]).to eq(2)
+        expect(member_data[:total_cost]).to be_within(0.001).of(1.5)
+      end
+    end
+
+    it 'keeps last_active_at all-time even when it falls outside the days window' do
+      create(:tool_event, organization: organization, user: member, occurred_at: 90.days.ago)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/members",
+                        user: member,
+                        organization: organization,
+                        params: { days: 1 }
+
+      expect_success
+      member_data = json_data.find { |m| m[:user][:email] == member.email }
+      expect(member_data[:total_events]).to eq(0)
+      expect(member_data[:last_active_at]).to be_present
+    end
   end
 
   describe 'GET /api/v1/organizations/:organization_id/members/:id' do
@@ -580,6 +636,7 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
              organization: organization,
              user: member,
              tool_name: 'cursor',
+             model: 'claude-3-5-sonnet',
              tokens_in: 50,
              tokens_out: 200,
              cost_usd: 0.02,
@@ -600,6 +657,7 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
       expect(json_response[:cost_change_percent]).to be_a(Numeric)
       expect(json_response[:tokens_change_percent]).to be_a(Numeric)
       expect(json_response[:tool_breakdown]).to be_an(Array)
+      expect(json_response[:model_breakdown]).to be_an(Array)
     end
 
     it 'returns tool_breakdown with correct field names' do
@@ -611,7 +669,30 @@ RSpec.describe 'Api::V1::OrganizationMembers', type: :request do
       tool = json_response[:tool_breakdown].first
       expect(tool).to have_key(:tool_name)
       expect(tool).to have_key(:event_count)
+      expect(tool).to have_key(:tokens_in)
+      expect(tool).to have_key(:tokens_out)
       expect(tool).to have_key(:cost_usd)
+    end
+
+    it 'returns model_breakdown with correct field names for the period' do
+      create(:tool_event,
+             organization: organization,
+             user: member,
+             tool_name: 'cursor',
+             model: 'claude-3-5-sonnet',
+             tokens_in: 300,
+             tokens_out: 900,
+             cost_usd: 0.10,
+             occurred_at: 5.days.ago)
+
+      authenticated_get "/api/v1/organizations/#{organization.id}/members/#{member_membership.id}/dashboard_stats",
+                        user: owner,
+                        organization: organization
+
+      expect_success
+      expect(json_response[:model_breakdown]).to be_an(Array)
+      model = json_response[:model_breakdown].first
+      expect(model).to include(:model, :event_count, :tokens_in, :tokens_out, :cost_usd)
     end
 
     it 'filters by explicit period param' do

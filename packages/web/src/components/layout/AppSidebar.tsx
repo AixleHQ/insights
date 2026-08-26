@@ -56,6 +56,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { roleIcons, roleColors } from "@/lib/role-display";
@@ -142,11 +143,12 @@ function CreateOrgDialog({
             </div>
             <div className="space-y-2">
               <Label htmlFor="org-description">Description (optional)</Label>
-              <Input
+              <Textarea
                 id="org-description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Our engineering team"
+                className="h-24 resize-none"
               />
             </div>
           </div>

@@ -33,6 +33,20 @@ RSpec.describe JwtAuth do
 
         expect(status).to eq(200)
       end
+
+      it 'skips auth for the generic webhook receive route' do
+        env = Rack::MockRequest.env_for('/api/v1/webhooks/github/some-connector-id')
+        status, _headers, _body = middleware.call(env)
+
+        expect(status).to eq(200)
+      end
+
+      it 'skips auth for the generic webhook receive route regardless of provider' do
+        env = Rack::MockRequest.env_for('/api/v1/webhooks/linear/some-connector-id')
+        status, _headers, _body = middleware.call(env)
+
+        expect(status).to eq(200)
+      end
     end
 
     context 'without authorization header' do

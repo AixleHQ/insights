@@ -428,6 +428,22 @@ export function IntegrationCard({
           </div>
         )}
 
+        {healthStats?.stuck && (
+          <div className="flex items-center gap-1 text-xs font-medium text-warning">
+            <AlertCircle className="size-3 shrink-0" />
+            Sync stuck — started over an hour ago
+          </div>
+        )}
+
+        {healthStats?.stale && !healthStats.stuck && (
+          <div className="flex items-center gap-1 text-xs font-medium text-warning">
+            <AlertCircle className="size-3 shrink-0" />
+            {integration.last_sync_at
+              ? `Sync is stale — last synced ${formatDistanceToNow(integration.last_sync_at)}`
+              : "Never synced"}
+          </div>
+        )}
+
         {effectiveSyncError && (
           <ErrorPanel error={effectiveSyncError} />
         )}

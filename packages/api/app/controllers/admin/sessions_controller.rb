@@ -4,6 +4,7 @@ module Admin
   class SessionsController < ActionController::Base
     include ActionController::Cookies
     include ProxyAware
+    include AdminContentSecurityPolicy
 
     skip_forgery_protection
 
@@ -15,13 +16,19 @@ module Admin
         render :error, layout: false
       else
         verifier = SecureRandom.urlsafe_base64(32)
+        state    = SecureRandom.urlsafe_base64(32)
         session[:pkce_verifier] = verifier
-        redirect_to auth_service.authorize_url(callback_url, verifier), allow_other_host: true
+        session[:oauth_state]   = state
+        redirect_to auth_service.authorize_url(callback_url, verifier, state), allow_other_host: true
       end
     end
 
     # GET /admin/callback — handle OIDC callback with authorization code
     def callback
+      unless valid_state?(params[:state])
+        return redirect_to "/admin/login?error=#{ERB::Util.url_encode('Invalid or expired login attempt. Please try again.')}"
+      end
+
       result = auth_service.authenticate(params[:code], session.delete(:pkce_verifier), callback_url)
 
       if result.success?
@@ -73,6 +80,12 @@ module Admin
 
     def callback_url
       "#{external_origin}/admin/callback"
+    end
+
+    def valid_state?(returned_state)
+      expected_state = session.delete(:oauth_state)
+      expected_state.present? && returned_state.present? &&
+        ActiveSupport::SecurityUtils.secure_compare(expected_state, returned_state)
     end
   end
 end

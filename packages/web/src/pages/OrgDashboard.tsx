@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Activity, DollarSign, AlertTriangle, Users } from "lucide-react";
 import { useOrg } from "@/contexts/OrgContext";
-import { useOverviewStats, useActiveUsers, useDailyStats, useEvents, useProjects, clientTimezone } from "@/hooks/useApi";
+import { useOverviewStats, useActiveUsers, useDailyStats, useEvents, useProjects, useOrganizationMembers, clientTimezone } from "@/hooks/useApi";
 import {
   MetricCard,
   MetricGrid,
@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/select";
 import { MemberDashboard } from "@/pages/MemberDashboard";
 import { StatCardSkeleton } from "@/components/ui/skeletons";
-import { formatPercent, periodLabel } from "@/lib/formatters";
+import { formatCost, formatCount, formatTokens, periodLabel } from "@/lib/formatters";
 import { type DashboardPeriod } from "@/lib/types";
 import { currentMonth, getLast12Months, isCurrentMonth, periodToDateRange } from "@/lib/dashboardUtils";
 import { AppRoutes } from "@/lib/routes";
@@ -92,6 +92,7 @@ export function OrgDashboard() {
   const [personalProjectId, setPersonalProjectId] = useState<string | undefined>();
 
   const orgId = currentOrg?.id || "";
+  const { data: projects } = useProjects(orgId);
   const isAllTime = selectedPeriod.type === "all_time";
   // AIX-496: the Cost Trend chart has its own Last 7/30 Days window, which should
   // stay a true trailing window (crossing into the previous month if needed) when the
@@ -99,6 +100,7 @@ export function OrgDashboard() {
   const isCurrentMonthSelected = selectedPeriod.type === "month" && isCurrentMonth(selectedPeriod.value);
   const dailyStatsPeriod = isCurrentMonthSelected ? undefined : selectedPeriod;
 
+  const { data: members } = useOrganizationMembers(orgId);
   // AIX-530: selectedProjectId belongs to whichever org it was picked under.
   // Switching orgs must clear it, or dashboard requests keep scoping to a
   // project that doesn't belong to the newly selected org, causing 404s.
@@ -109,7 +111,6 @@ export function OrgDashboard() {
     setPersonalProjectId(undefined);
   }
 
-  const { data: projects } = useProjects(orgId);
   const { data: stats, isLoading: isLoadingStats, isError: isErrorStats, refetch: refetchStats } = useOverviewStats(orgId, selectedProjectId, selectedPeriod);
   // Active Members is intentionally pinned to a rolling window, not the month selector.
   const { data: activeUsersData } = useActiveUsers(orgId, selectedProjectId, ACTIVE_USERS_WINDOW_DAYS);
@@ -210,6 +211,15 @@ export function OrgDashboard() {
     : -1;
 
   const periodDesc = periodLabel(selectedPeriod);
+  const activeMembers = activeUsersData?.active_users ?? 0;
+  const totalMembers = members?.length ?? 0;
+  const eventsSubtitle = periodDesc;
+  const costSubtitle =
+    isAllTime && stats
+      ? `All time - ${formatCost(stats.total_cost_usd ?? 0)}`
+      : periodDesc;
+  const riskSubtitle = `${formatTokens(stats?.total_tokens_in ?? 0)} In · ${formatTokens(stats?.total_tokens_out ?? 0)} Out`;
+  const activeMembersSubtitle = `Last ${ACTIVE_USERS_WINDOW_DAYS} days`;
 
   return (
     <div className="space-y-6">
@@ -227,6 +237,7 @@ export function OrgDashboard() {
                 orgId={orgId}
                 value={selectedProjectId}
                 onChange={setSelectedProjectId}
+                allLabel="All Projects"
               />
               <PeriodSelector value={selectedPeriod} onChange={setSelectedPeriod} />
             </>
@@ -264,8 +275,6 @@ export function OrgDashboard() {
         </div>
       ) : (
         <>
-          <WeeklyToolUsageChart orgId={orgId} projectId={selectedProjectId} externalPeriod={selectedPeriod} />
-
           {isErrorStats ? (
             <Card>
               <CardContent className="py-6">
@@ -277,72 +286,65 @@ export function OrgDashboard() {
               </CardContent>
             </Card>
           ) : (
-          <MetricGrid className="lg:grid-cols-4 xl:grid-cols-4">
-            {isLoadingStats ? (
-              <>
-                <StatCardSkeleton showDescription />
-                <StatCardSkeleton showDescription />
-                <StatCardSkeleton showDescription />
-                <StatCardSkeleton showDescription />
-              </>
-            ) : (
-              <>
-            <MetricCard
-              title="Total Events"
-              value={stats?.total_events ?? 0}
-              format="number"
-              icon={<Activity className="size-5" />}
-              trend={
-                stats?.events_change_percent != null
-                  ? stats.events_change_percent > 0
-                    ? "up"
-                    : "down"
-                  : "neutral"
-              }
-              trendValue={
-                stats?.events_change_percent != null
-                  ? formatPercent(Math.abs(stats.events_change_percent))
-                  : undefined
-              }
-              description={periodDesc}
-            />
-            <MetricCard
-              title="Total Cost"
-              value={stats?.total_cost_usd ?? 0}
-              format="currency"
-              icon={<DollarSign className="size-5" />}
-              trend={
-                stats?.cost_change_percent != null
-                  ? stats.cost_change_percent > 0
-                    ? "up"
-                    : "down"
-                  : "neutral"
-              }
-              trendValue={
-                stats?.cost_change_percent != null
-                  ? formatPercent(Math.abs(stats.cost_change_percent))
-                  : undefined
-              }
-              description={periodDesc}
-            />
-            <MetricCard
-              title="Risk Alerts"
-              value={stats?.risk_alerts ?? 0}
-              format="number"
-              icon={<AlertTriangle className="size-5" />}
-              description={periodDesc}
-            />
-            <MetricCard
-              title="Active Members"
-              value={activeUsersData?.active_users ?? 0}
-              format="number"
-              icon={<Users className="size-5" />}
-              description={`Last ${ACTIVE_USERS_WINDOW_DAYS} days`}
-            />
-              </>
-            )}
-          </MetricGrid>
+            <MetricGrid className="lg:grid-cols-4 xl:grid-cols-4">
+              {isLoadingStats ? (
+                <>
+                  <StatCardSkeleton showDescription />
+                  <StatCardSkeleton showDescription />
+                  <StatCardSkeleton showDescription />
+                  <StatCardSkeleton showDescription />
+                </>
+              ) : (
+                <>
+                  <MetricCard
+                    title="Total Events"
+                    value={stats?.total_events ?? 0}
+                    format="number"
+                    icon={<Activity className="size-5" />}
+                    description={eventsSubtitle}
+                  />
+                  <MetricCard
+                    title="Total Cost"
+                    value={stats?.total_cost_usd ?? 0}
+                    format="currency"
+                    icon={<DollarSign className="size-5" />}
+                    description={costSubtitle}
+                  />
+                  <MetricCard
+                    title="Risk Alerts"
+                    value={stats?.risk_alerts ?? 0}
+                    format="number"
+                    icon={<AlertTriangle className="size-5" />}
+                    description={riskSubtitle}
+                  />
+                  <MetricCard
+                    title="Active Members"
+                    value={
+                      totalMembers > 0
+                        ? `${formatCount(activeMembers)}/${formatCount(totalMembers)}`
+                        : formatCount(activeMembers)
+                    }
+                    icon={<Users className="size-5" />}
+                    description={activeMembersSubtitle}
+                  />
+                </>
+              )}
+            </MetricGrid>
           )}
+
+          <WeeklyToolUsageChart
+            orgId={orgId}
+            projectId={selectedProjectId}
+            projects={projects}
+            externalPeriod={selectedPeriod}
+          />
+
+          <RiskAlertsTable
+            orgId={orgId}
+            projectId={selectedProjectId}
+            projects={projects}
+            period={selectedPeriod}
+          />
 
           <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
             <CostTrendChart
@@ -352,6 +354,8 @@ export function OrgDashboard() {
               onRetry={() => refetchDaily()}
               allTime={isAllTime}
               monthScoped={selectedPeriod.type === "month" && !isCurrentMonthSelected}
+              projectId={selectedProjectId}
+              projects={projects}
             />
             <ActivityFeed
               subtitle={activitySubtitle}
@@ -365,10 +369,15 @@ export function OrgDashboard() {
             />
           </div>
 
-          <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-            <TopToolsChart data={toolUsage} isLoading={isLoadingDaily} isError={isErrorDaily} onRetry={() => refetchDaily()} periodDesc={periodLabel(selectedPeriod)} />
-            <RiskAlertsTable orgId={orgId} projectId={selectedProjectId} period={selectedPeriod} />
-          </div>
+          <TopToolsChart
+            data={toolUsage}
+            isLoading={isLoadingDaily}
+            isError={isErrorDaily}
+            onRetry={() => refetchDaily()}
+            periodDesc={periodLabel(selectedPeriod)}
+            projectId={selectedProjectId}
+            projects={projects}
+          />
 
           <ToolInsightsSection
             orgId={orgId}

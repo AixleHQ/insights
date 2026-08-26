@@ -1,7 +1,7 @@
 # DATA-CURSOR.md — Cursor vendor surface map
 
 > **Audience:** db90 engineers extending the ingest path beyond the current `chat` + `completion` coverage. Companion to [`TOKENS.md`](TOKENS.md) (the May-2026 baseline) and [`DATA-CURRENT.md`](DATA-CURRENT.md) (the validated "what we capture today" view, produced by AIX-235).
-> **Source ticket:** AIX-233.
+> **Source ticket:** [AIX-233](AIX-233).
 >
 > This document maps **what Cursor exposes about AI-assisted activity**, across every surface we identified, so the gap-analysis triage in AIX-235 can compare it against what the db90 CLI actually ingests.
 >
@@ -687,7 +687,7 @@ The mapper produces a `Db90Payload` object (`packages/tools/db90-cursor/src/mapp
 
 ## 5. Hidden / undocumented findings
 
-Every entry below is supported by the original research trail captured during the AIX-136 epic.
+Every entry below is supported by web research into Cursor's documented and undocumented surfaces.
 
 ### 5.1 Separate `~/.cursor/ai-tracking/ai-code-tracking.db` SQLite store
 

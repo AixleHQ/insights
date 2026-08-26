@@ -1,5 +1,14 @@
 /**
- * Cursor Path B — recentCommit metadata on tool events (DATA-CURSOR.md §2.7).
+ * Commit attribution helpers for tool events.
+ *
+ * Two distinct commit event shapes exist:
+ * - Cursor  — event_type: "commit", tool_name: "cursor", has metadata.commit_hash
+ *             (DATA-CURSOR.md §2.7 "Path B — recentCommit snapshot")
+ * - Claude  — event_type: "commit", tool_name: "claude_code", no commit_hash
+ *             (derived from tool_use Bash+git-commit blocks; AIX-259)
+ *
+ * parseRecentCommitFields() returns null for Claude commits so callers
+ * degrade intentionally rather than silently.
  */
 
 export { formatAiPercentage } from "@/lib/formatters";
@@ -10,6 +19,7 @@ export interface RecentCommitFields {
   repoName?: string;
   aiPercentage?: number;
   commitMessage?: string;
+  source: "cursor";
 }
 
 function asNonEmptyString(value: unknown): string | undefined {
@@ -26,20 +36,26 @@ function parseAiPercentage(value: unknown): number | undefined {
 }
 
 /** True when the event is a Cursor recent-commit ingest (Path B). */
-export function isRecentCommitEvent(
+export function isCursorCommitEvent(
+  toolName?: string | null,
   eventType?: string | null,
   metadata?: Record<string, unknown> | null
 ): boolean {
-  if (eventType === "commit") return true;
+  if (toolName === "cursor" && eventType === "commit") return true;
   return metadata?.source === "recent_commit";
 }
 
-/** Extract display fields from event metadata (snake_case from API). */
+/**
+ * Extract Cursor commit attribution fields from event metadata.
+ * Returns null for Claude commit events (tool_name: "claude_code") — they
+ * lack commit_hash and the Cursor-specific attribution fields.
+ */
 export function parseRecentCommitFields(
   metadata?: Record<string, unknown> | null,
-  eventType?: string | null
+  eventType?: string | null,
+  toolName?: string | null
 ): RecentCommitFields | null {
-  if (!isRecentCommitEvent(eventType, metadata)) return null;
+  if (!isCursorCommitEvent(toolName, eventType, metadata)) return null;
 
   const commitHash = asNonEmptyString(metadata?.commit_hash);
   if (!commitHash) return null;
@@ -50,6 +66,7 @@ export function parseRecentCommitFields(
     repoName: asNonEmptyString(metadata?.repo_name),
     aiPercentage: parseAiPercentage(metadata?.ai_percentage),
     commitMessage: asNonEmptyString(metadata?.commit_message),
+    source: "cursor",
   };
 }
 

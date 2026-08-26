@@ -10,6 +10,7 @@ import { ChartSkeleton } from "@/components/ui/skeletons";
 import { ErrorState } from "@/components/ui/error-state";
 import { getToolColor, humanizeToolName } from "@/lib/utils";
 import { formatCost, formatCount } from "@/lib/formatters";
+import { projectScopeLabel } from "@/lib/dashboardUtils";
 
 export interface ToolUsageData {
   tool_name: string;
@@ -23,6 +24,8 @@ interface TopToolsChartProps {
   isError?: boolean;
   onRetry?: () => void;
   periodDesc?: string;
+  projectId?: string;
+  projects?: { id: string; name: string }[];
   className?: string;
 }
 
@@ -37,7 +40,7 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-export function TopToolsChart({ data, isLoading, isError, onRetry, periodDesc, className }: TopToolsChartProps) {
+export function TopToolsChart({ data, isLoading, isError, onRetry, periodDesc, projectId, projects, className }: TopToolsChartProps) {
   const sortedData = [...data]
     .sort((a, b) => b.event_count - a.event_count)
     .slice(0, 5)
@@ -47,13 +50,20 @@ export function TopToolsChart({ data, isLoading, isError, onRetry, periodDesc, c
       color: getToolColor(d.tool_name),
     }));
 
+  const scopeLabel = projects ? projectScopeLabel(projectId, projects, "Top tools") : undefined;
+  const description = scopeLabel
+    ? periodDesc
+      ? `${scopeLabel} · ${periodDesc}`
+      : scopeLabel
+    : periodDesc
+      ? `Most used tools — ${periodDesc}`
+      : "Most used tools by event count";
+
   return (
     <Card className={className}>
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-medium">Top Tools</CardTitle>
-        <CardDescription className="text-xs">
-          {periodDesc ? `Most used tools — ${periodDesc}` : "Most used tools by event count"}
-        </CardDescription>
+        <CardDescription className="text-xs">{description}</CardDescription>
       </CardHeader>
       <CardContent>
         {isError ? (

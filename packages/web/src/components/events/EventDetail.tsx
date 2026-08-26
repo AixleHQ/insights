@@ -125,7 +125,7 @@ export function EventDetail({ event, isLoading, className }: EventDetailProps) {
     ? formatEventDate(event.created_at)
     : formatDateTime(event.created_at);
 
-  const recentCommit = parseRecentCommitFields(event.metadata, event.event_type);
+  const recentCommit = parseRecentCommitFields(event.metadata, event.event_type, event.tool_name);
   const isDerivative = isDerivativeEvent(event.event_type);
   const emptyPromptMessage = isDerivative
     ? "This event has no prompt text. See its summary above."

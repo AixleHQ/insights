@@ -12,9 +12,13 @@ const {
   saveStoredCredentials: vi.fn(),
 }));
 
-vi.mock("../../auth/exchange.js", () => ({
-  exchangeIngestToken,
-}));
+vi.mock("../../auth/exchange.js", async (importActual) => {
+  const actual = await importActual<typeof import("../../auth/exchange.js")>();
+  return {
+    ...actual,
+    exchangeIngestToken,
+  };
+});
 
 vi.mock("../../auth/keycloak.js", () => ({
   defaultKeycloakClientId: () => "db90-cli",
@@ -28,6 +32,7 @@ vi.mock("../../auth/credentials.js", () => ({
 }));
 
 import { loginAndPersistCredentials } from "../../auth/flow.js";
+import { OrganizationSelectionRequiredError } from "../../auth/exchange.js";
 
 describe("loginAndPersistCredentials", () => {
   beforeEach(() => {
@@ -156,7 +161,7 @@ describe("loginAndPersistCredentials", () => {
     expect(warnings.join("\n")).toContain("ingest tokens and telemetry");
     expect(warnings.join("\n")).toContain("HTTPS");
     expect(saveStoredCredentials).toHaveBeenCalledWith(
-      expect.objectContaining({ host: "http://api.example.com" }),
+      expect.objectContaining({ host: "http://api.example.com", insecureHttpAllowed: true }),
       "/tmp/db90-mcp-auth-flow-test"
     );
   });
@@ -219,6 +224,105 @@ describe("loginAndPersistCredentials", () => {
         exchangeOrganizationId: orgUuid,
         toolName: "claude_code",
       })
+    );
+  });
+
+  it("returns a structured failure carrying organizations on org-selection 422", async () => {
+    exchangeIngestToken.mockRejectedValue(
+      new OrganizationSelectionRequiredError("You belong to 2 organizations...", [
+        { id: "11111111-1111-1111-1111-111111111111", name: "Acme", role: "owner" },
+        { id: "22222222-2222-2222-2222-222222222222", name: "Globex", role: "member" },
+      ])
+    );
+
+    const result = await loginAndPersistCredentials({
+      db90Host: "http://localhost:3000",
+      keycloakIssuer: "http://issuer.test",
+      toolName: "claude_code",
+      appDir: "/tmp/db90-mcp-auth-flow-test",
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: "organization_selection_required",
+      organizations: [{ name: "Acme" }, { name: "Globex" }],
+    });
+    expect(saveStoredCredentials).not.toHaveBeenCalled();
+  });
+
+  it("wipes previously-stored accounts when organizationId changes on re-init", async () => {
+    const ORG_A = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa";
+    const ORG_B = "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb";
+    loadCredentials.mockResolvedValue({
+      host: "http://localhost:3000",
+      organizationId: ORG_A,
+      accounts: {
+        cursor: "db90_cursor_org_a",
+      },
+    });
+    exchangeIngestToken.mockResolvedValue({
+      ingestHost: "http://localhost:3000",
+      organizationId: ORG_B,
+      ingestToken: "db90_claude_org_b",
+      accounts: {
+        claude_code: { ingestToken: "db90_claude_org_b" },
+      },
+    });
+
+    await loginAndPersistCredentials({
+      db90Host: "http://localhost:3000",
+      keycloakIssuer: "http://issuer.test",
+      toolName: "claude_code",
+      appDir: "/tmp/db90-mcp-auth-flow-test",
+    });
+
+    expect(saveStoredCredentials).toHaveBeenCalledWith(
+      {
+        host: "http://localhost:3000",
+        organizationId: ORG_B,
+        accounts: {
+          claude_code: "db90_claude_org_b",
+        },
+      },
+      "/tmp/db90-mcp-auth-flow-test"
+    );
+  });
+
+  it("keeps previously-stored accounts when organizationId is unchanged on re-init", async () => {
+    const ORG_A = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa";
+    loadCredentials.mockResolvedValue({
+      host: "http://localhost:3000",
+      organizationId: ORG_A,
+      accounts: {
+        cursor: "db90_cursor_org_a",
+      },
+    });
+    exchangeIngestToken.mockResolvedValue({
+      ingestHost: "http://localhost:3000",
+      organizationId: ORG_A,
+      ingestToken: "db90_claude_org_a",
+      accounts: {
+        claude_code: { ingestToken: "db90_claude_org_a" },
+      },
+    });
+
+    await loginAndPersistCredentials({
+      db90Host: "http://localhost:3000",
+      keycloakIssuer: "http://issuer.test",
+      toolName: "claude_code",
+      appDir: "/tmp/db90-mcp-auth-flow-test",
+    });
+
+    expect(saveStoredCredentials).toHaveBeenCalledWith(
+      {
+        host: "http://localhost:3000",
+        organizationId: ORG_A,
+        accounts: {
+          claude_code: "db90_claude_org_a",
+          cursor: "db90_cursor_org_a",
+        },
+      },
+      "/tmp/db90-mcp-auth-flow-test"
     );
   });
 });

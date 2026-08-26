@@ -264,25 +264,42 @@ export function Integrations() {
         </TabsList>
 
         <TabsContent value="connected" className="space-y-4">
-          {isOwner && healthData?.summary && healthData.summary.total > 0 && (
-            <div className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
-              <span className="text-muted-foreground">Connector health:</span>
-              {healthData.summary.error > 0 ? (
-                <span className="font-medium text-destructive">
-                  {healthData.summary.error} of {healthData.summary.total} failing
-                </span>
-              ) : (
-                <span className="font-medium text-success">
-                  All {healthData.summary.total} connectors healthy
-                </span>
-              )}
-              {healthData.summary.disconnected > 0 && (
-                <span className="text-muted-foreground">
-                  · {healthData.summary.disconnected} disconnected
-                </span>
-              )}
-            </div>
-          )}
+          {isOwner && healthData?.summary && healthData.summary.total > 0 && (() => {
+            const s = healthData.summary;
+            const allHealthy =
+              s.error === 0 && s.stale === 0 && s.stuck === 0 && s.testing === 0;
+            const segments = [
+              { count: s.error, label: "failing", className: "text-destructive" },
+              { count: s.stale, label: "stale", className: "text-warning" },
+              { count: s.stuck, label: "stuck", className: "text-warning" },
+              { count: s.testing - s.stuck, label: "syncing", className: "text-muted-foreground" },
+              { count: s.healthy, label: "healthy", className: "text-success" },
+            ].filter((seg) => seg.count > 0);
+            return (
+              <div className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
+                <span className="text-muted-foreground">Connector health:</span>
+                {allHealthy ? (
+                  <span className="font-medium text-success">
+                    All {s.total} connectors healthy
+                  </span>
+                ) : (
+                  <span className="font-medium">
+                    {segments.map((seg, i) => (
+                      <span key={seg.label} className={seg.className}>
+                        {i > 0 && <span className="text-muted-foreground"> · </span>}
+                        {seg.count} {seg.label}
+                      </span>
+                    ))}
+                  </span>
+                )}
+                {s.disconnected > 0 && (
+                  <span className="text-muted-foreground">
+                    · {s.disconnected} disconnected
+                  </span>
+                )}
+              </div>
+            );
+          })()}
           {!isLoading && integrations.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {(["all", "org", "project", "persona"] as const).map((s) => {

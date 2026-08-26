@@ -7,7 +7,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RangeSegmentedControl } from "@/components/dashboard/RangeSegmentedControl";
@@ -20,7 +20,7 @@ import {
 import type { ChartConfig } from "@/components/ui/chart";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Activity, DollarSign, Coins, Users, RefreshCw, LayoutGrid } from "lucide-react";
+import { Activity, DollarSign, Coins, Users, RefreshCw } from "lucide-react";
 import { formatCost, formatTokens, formatCount } from "@/lib/formatters";
 import {
   useActiveTools,
@@ -31,12 +31,14 @@ import {
   useConnectors,
   useConnectorSyncStatus,
   useSyncConnector,
+  useProjects,
 } from "@/hooks/useApi";
 import { ToolModelTable } from "./ToolModelTable";
 import { ToolUsersTable } from "./ToolUsersTable";
 import { ToolEventTypesTable } from "./ToolEventTypesTable";
 import { ToolModelCostChart } from "./ToolModelCostChart";
 import { ErrorState } from "@/components/ui/error-state";
+import { projectScopeLabel } from "@/lib/dashboardUtils";
 
 interface ToolInsightsSectionProps {
   orgId: string;
@@ -252,7 +254,6 @@ function ToolTabContent({
   const totalTokensIn = daily.reduce((s, d) => s + d.tokensIn, 0);
   const totalTokensOut = daily.reduce((s, d) => s + d.tokensOut, 0);
   const activeUsers = users.length;
-  const modelsUsed = models.length;
 
   const chartData = daily.map((d) => ({
     date: formatDate(d.date),
@@ -280,8 +281,6 @@ function ToolTabContent({
     );
   }
 
-  const hasTokenData = totalTokensIn > 0 || totalTokensOut > 0;
-
   return (
     <div className="space-y-6 mt-4">
       {activeConnector && (
@@ -291,15 +290,8 @@ function ToolTabContent({
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
         <StatCard title="Total Events" value={formatCount(totalEvents)} icon={Activity} isLoading={isLoadingDaily} />
         <StatCard title="Total Cost" value={formatCost(totalCost)} icon={DollarSign} isLoading={isLoadingDaily} />
-        {hasTokenData && (
-          <>
-            <StatCard title="Tokens In" value={formatTokens(totalTokensIn)} icon={Coins} isLoading={isLoadingDaily} />
-            <StatCard title="Tokens Out" value={formatTokens(totalTokensOut)} icon={Coins} isLoading={isLoadingDaily} />
-          </>
-        )}
-        {!hasTokenData && (
-          <StatCard title="Models Used" value={String(modelsUsed)} icon={LayoutGrid} isLoading={isLoadingModels} />
-        )}
+        <StatCard title="Tokens In" value={formatTokens(totalTokensIn)} icon={Coins} isLoading={isLoadingDaily} />
+        <StatCard title="Tokens Out" value={formatTokens(totalTokensOut)} icon={Coins} isLoading={isLoadingDaily} />
         <StatCard title="Active Users" value={String(activeUsers)} icon={Users} isLoading={isLoadingUsers} />
       </div>
 
@@ -393,12 +385,14 @@ export function ToolInsightsSection({ orgId, days, onDaysChange, projectId }: To
   const queryClient = useQueryClient();
   const { data: activeToolsResp, isLoading } = useActiveTools(orgId);
   const { data: connectors } = useConnectors(orgId);
+  const { data: projects } = useProjects(orgId);
   const { mutateAsync: syncConnector } = useSyncConnector();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<string | null>(null);
 
   const toolsWithData = activeToolsResp?.tools ?? [];
   const resolvedTab = activeTab ?? toolsWithData[0]?.tool_name ?? "";
+  const subtitle = `${projectScopeLabel(projectId, projects, "Insights")} · Last ${humanizeDays(days)}`;
 
   async function handleRefreshNow() {
     const connectorType = TOOL_CONNECTOR[resolvedTab];
@@ -438,7 +432,10 @@ export function ToolInsightsSection({ orgId, days, onDaysChange, projectId }: To
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="type-h4">Tool Insights</CardTitle>
+        <div>
+          <CardTitle className="type-h4">Tool Insights</CardTitle>
+          <CardDescription className="text-xs">{subtitle}</CardDescription>
+        </div>
         <div className="flex items-center gap-2">
           <Button
             variant="outline"

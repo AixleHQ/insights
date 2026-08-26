@@ -4,7 +4,8 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Integrations } from "./Integrations";
-import { useConnectors, useToolAccounts } from "../hooks/useApi";
+import { useConnectors, useConnectorHealth, useToolAccounts } from "../hooks/useApi";
+import type { ConnectorHealthSummary } from "@/lib/types";
 import { SHOW_INTEGRATION_CATALOG } from "@/lib/featureFlags";
 import { AppRoutes } from "@/lib/routes";
 
@@ -221,6 +222,52 @@ describe("Integrations", () => {
       renderAt("/integrations/connected");
       expect(screen.getByText("No integrations configured")).toBeInTheDocument();
       expect(screen.queryByText("Cursor")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("Health banner", () => {
+    const summary = (over: Partial<ConnectorHealthSummary>): ConnectorHealthSummary => ({
+      total: 7,
+      connected: 7,
+      testing: 0,
+      error: 0,
+      disconnected: 0,
+      stale: 0,
+      stuck: 0,
+      healthy: 7,
+      ...over,
+    });
+
+    const mockHealth = (s: ConnectorHealthSummary) =>
+      vi.mocked(useConnectorHealth).mockReturnValue({
+        data: { summary: s, connectors: [] },
+      } as ReturnType<typeof useConnectorHealth>);
+
+    it('reads "All N connectors healthy" when everything is healthy', () => {
+      mockHealth(summary({}));
+      renderAt("/integrations/connected");
+      expect(screen.getByText(/All 7 connectors healthy/i)).toBeInTheDocument();
+    });
+
+    it("is not all-healthy and shows a stale segment when a connector is stale", () => {
+      mockHealth(summary({ connected: 7, healthy: 6, stale: 1 }));
+      renderAt("/integrations/connected");
+      expect(screen.queryByText(/All 7 connectors healthy/i)).not.toBeInTheDocument();
+      expect(screen.getByText(/1 stale/i)).toBeInTheDocument();
+    });
+
+    it("shows a stuck segment when a connector is stuck", () => {
+      mockHealth(summary({ connected: 6, testing: 1, healthy: 6, stuck: 1 }));
+      renderAt("/integrations/connected");
+      expect(screen.queryByText(/All .* connectors healthy/i)).not.toBeInTheDocument();
+      expect(screen.getByText(/1 stuck/i)).toBeInTheDocument();
+    });
+
+    it("shows a syncing segment (not all-healthy) for fresh in-progress syncs", () => {
+      mockHealth(summary({ connected: 5, testing: 2, healthy: 5, stuck: 0 }));
+      renderAt("/integrations/connected");
+      expect(screen.queryByText(/All .* connectors healthy/i)).not.toBeInTheDocument();
+      expect(screen.getByText(/2 syncing/i)).toBeInTheDocument();
     });
   });
 

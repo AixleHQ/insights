@@ -12,8 +12,8 @@ class UserSyncService
 
   # Email domains that should be auto-assigned to organizations
   DOMAIN_ORG_MAPPING = {
-    "example.com" => "acme-corp",
-    "partner.example.com" => "partner-corp"
+    "example.com" => "dualboot-partners",
+    "partner.example.com" => "fueled"
   }.freeze
 
   class << self
@@ -25,14 +25,25 @@ class UserSyncService
       Rails.logger.info "[UserSyncService] sync_from_claims: sub=#{keycloak_sub}, email=#{email}"
 
       user = find_or_initialize_user_with_email(keycloak_sub, email)
+      # Domain auto-join must run only for brand-new users. sync_from_claims runs on every
+      # authenticated request; re-running find_or_create would resurrect org/project
+      # membership after leave/remove (AIX-611) — e.g. @example.com → dualboot-partners.
+      #
+      # Intentionally NOT "never had a membership in this org": after leave the user is not a
+      # member, so that predicate would re-add them. Tradeoff: seeded / Administrate
+      # pending-* users are not new_record? on first login, so domain auto-join never runs for
+      # them — org assignment stays an admin responsibility (see user_sync_service_spec).
+      is_new_user = user.new_record?
       update_user_attributes(user, claims)
       user.save!
 
       Rails.logger.info "[UserSyncService] User synced: id=#{user.id}, email=#{user.email}, keycloak_sub=#{user.keycloak_sub}"
       Rails.logger.info "[UserSyncService] User orgs: #{user.organization_memberships.count}, events: #{ToolEvent.where(user_id: user.id).count}"
 
-      auto_assign_organization(user, claims)
-      auto_assign_project(user, claims)
+      if is_new_user
+        auto_assign_organization(user, claims)
+        auto_assign_project(user, claims)
+      end
 
       user
     end

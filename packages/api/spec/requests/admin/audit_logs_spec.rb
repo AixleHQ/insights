@@ -46,13 +46,14 @@ RSpec.describe 'Admin Audit Logs', type: :request do
     end
 
     it 'shows the acting user resolved through the tool event' do
-      tool_event = create(:tool_event)
+      user = create(:user, name: "Pres. Lino O'Connell")
+      tool_event = create(:tool_event, user: user)
       audit_log = create(:audit_log, tool_event: tool_event)
 
       get admin_audit_log_path(audit_log)
 
       expect(response).to have_http_status(:ok)
-      expect(response.body).to include(tool_event.user.display_name)
+      expect(CGI.unescapeHTML(response.body)).to include(tool_event.user.display_name)
     end
   end
 

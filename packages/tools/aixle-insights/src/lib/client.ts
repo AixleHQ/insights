@@ -1,3 +1,5 @@
+import { evaluateTransportSecurity } from "./transport-security.js";
+
 /**
  * Minimum payload contract for ingestion — every connector produces events that
  * at least carry an ISO timestamp. Connectors add their own fields; we don't
@@ -9,6 +11,13 @@ export interface IngestPayload {
 }
 
 export interface PostEventOptions {
+  /**
+   * Skip the HTTPS-or-loopback gate for this host. Only ever set this to
+   * `true` when the caller has independently confirmed the user explicitly
+   * consented via `init --insecure` for this exact credential (see
+   * `StoredCredentials.insecureHttpAllowed`). Defaults to `false`.
+   */
+  allowInsecureHttp?: boolean;
   /** Override default console.error on non-ok HTTP response. */
   onHttpError?: (status: number, statusText: string, body: string) => void;
   /** Override default console.error on network-level failure. */
@@ -38,6 +47,23 @@ export async function postEvent(
   token: string,
   options: PostEventOptions = {}
 ): Promise<boolean> {
+  const transportSecurity = evaluateTransportSecurity(host, {
+    allowInsecureHttp: options.allowInsecureHttp === true,
+    label: "Aixle Insights ingest host",
+  });
+  if (!transportSecurity.ok) {
+    // Deliberately does NOT call options.onNetworkError/onHttpError: the retry
+    // wrapper in src/client.ts treats those as transient and retries with
+    // backoff. A scheme rejection is permanent — retrying wastes ~21s per
+    // event for nothing. Bare console.error mirrors this file's existing
+    // unrecoverable-failure logging style.
+    console.error(`Blocked event send — ${transportSecurity.error}`);
+    return false;
+  }
+  if (transportSecurity.warning) {
+    console.error(`Warning: ${transportSecurity.warning}`);
+  }
+
   const url = `${host.replace(/\/$/, "")}/api/v1/ingest/events`;
   const headers = {
     "Content-Type": "application/json",

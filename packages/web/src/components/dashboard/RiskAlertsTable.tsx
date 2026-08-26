@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { CheckCircle } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/ui/error-state";
 import {
@@ -11,9 +11,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ProviderLogo } from "@/components/icons";
 import { useOrgRiskAlerts } from "@/hooks/useApi";
 import { humanizeToolName } from "@/lib/utils";
-import { formatCost, formatTokens, formatCount } from "@/lib/formatters";
+import { formatCost, formatTokens, formatCount, periodLabel } from "@/lib/formatters";
+import { projectScopeLabel } from "@/lib/dashboardUtils";
 import { cn } from "@/lib/utils";
 import { AppRoutes } from "@/lib/routes";
 import type { DashboardPeriod } from "@/lib/types";
@@ -21,23 +23,37 @@ import type { DashboardPeriod } from "@/lib/types";
 interface RiskAlertsTableProps {
   orgId: string;
   projectId?: string;
+  projects?: { id: string; name: string }[];
   period?: DashboardPeriod;
   className?: string;
 }
 
+/** Figma Eng Lead Risk Alerts: muted mixed-case headers, 16×8 cell padding. */
+const HEAD_CLASS = "text-xs font-medium text-muted-foreground";
+const CELL_CLASS = "py-4 px-2";
+const NUMERIC_CLASS = "text-right text-sm tabular-nums";
+const TOOL_NAME_CLASS = "text-sm";
+
 function SkeletonRow() {
   return (
     <TableRow>
-      <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-      <TableCell className="text-right"><Skeleton className="h-4 w-12 ml-auto" /></TableCell>
-      <TableCell className="hidden md:table-cell text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-      <TableCell className="hidden md:table-cell text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-      <TableCell className="text-right"><Skeleton className="h-4 w-14 ml-auto" /></TableCell>
+      <TableCell className={CELL_CLASS}>
+        <Skeleton className="h-8 w-36" />
+      </TableCell>
+      <TableCell className={cn(CELL_CLASS, "text-right")}>
+        <Skeleton className="ml-auto h-4 w-12" />
+      </TableCell>
+      <TableCell className={cn(CELL_CLASS, "text-right")}>
+        <Skeleton className="ml-auto h-4 w-28" />
+      </TableCell>
+      <TableCell className={cn(CELL_CLASS, "text-right")}>
+        <Skeleton className="ml-auto h-4 w-14" />
+      </TableCell>
     </TableRow>
   );
 }
 
-export function RiskAlertsTable({ orgId, projectId, period, className }: RiskAlertsTableProps) {
+export function RiskAlertsTable({ orgId, projectId, projects, period, className }: RiskAlertsTableProps) {
   const navigate = useNavigate();
   const { data: rows, isLoading, isError, refetch } = useOrgRiskAlerts(orgId, projectId, period);
 
@@ -45,26 +61,33 @@ export function RiskAlertsTable({ orgId, projectId, period, className }: RiskAle
     navigate(`${AppRoutes.events.root}?tool_name=${encodeURIComponent(toolName)}&risk_level=not_none`);
   };
 
+  const scopeLabel = projects ? projectScopeLabel(projectId, projects, "Risk alerts") : undefined;
+
   return (
     <Card className={cn(className)}>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base font-medium">Risk Alerts</CardTitle>
+      <CardHeader className="pb-2">
+        <span className="type-body-lg font-medium">Risk Alerts</span>
+        {scopeLabel && (
+          <CardDescription className="text-xs">
+            {scopeLabel}
+            {period && ` · ${periodLabel(period)}`}
+          </CardDescription>
+        )}
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent>
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Tool</TableHead>
-              <TableHead className="text-right">Events</TableHead>
-              <TableHead className="hidden md:table-cell text-right">Tokens In</TableHead>
-              <TableHead className="hidden md:table-cell text-right">Tokens Out</TableHead>
-              <TableHead className="text-right">Cost</TableHead>
+              <TableHead className={HEAD_CLASS}>Tool</TableHead>
+              <TableHead className={cn(HEAD_CLASS, "text-right")}>Events</TableHead>
+              <TableHead className={cn(HEAD_CLASS, "text-right")}>Tokens in / out</TableHead>
+              <TableHead className={cn(HEAD_CLASS, "text-right")}>Cost</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isError ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-24">
+                <TableCell colSpan={4} className="h-24">
                   <ErrorState
                     compact
                     title="Could not load risk alerts"
@@ -77,7 +100,7 @@ export function RiskAlertsTable({ orgId, projectId, period, className }: RiskAle
               Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} />)
             ) : !rows || rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
+                <TableCell colSpan={4} className="h-24 text-center">
                   <div className="flex flex-col items-center gap-2 text-muted-foreground">
                     <CheckCircle className="size-6 text-green-500" />
                     <span className="text-sm">No risk events detected</span>
@@ -91,17 +114,24 @@ export function RiskAlertsTable({ orgId, projectId, period, className }: RiskAle
                   className="cursor-pointer hover:bg-muted/50"
                   onClick={() => handleRowClick(row.toolName)}
                 >
-                  <TableCell className="font-medium">{humanizeToolName(row.toolName)}</TableCell>
-                  <TableCell className="text-right font-mono text-sm">
+                  <TableCell className={CELL_CLASS}>
+                    <div className="flex items-center gap-2">
+                      <ProviderLogo
+                        provider={row.toolName}
+                        size="sm"
+                        showBackground
+                        className="shrink-0 !size-8"
+                      />
+                      <span className={TOOL_NAME_CLASS}>{humanizeToolName(row.toolName)}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className={cn(CELL_CLASS, NUMERIC_CLASS)}>
                     {formatCount(row.eventCount)}
                   </TableCell>
-                  <TableCell className="hidden md:table-cell text-right font-mono text-sm text-muted-foreground">
-                    {formatTokens(row.tokensIn)}
+                  <TableCell className={cn(CELL_CLASS, NUMERIC_CLASS)}>
+                    {formatTokens(row.tokensIn)} / {formatTokens(row.tokensOut)}
                   </TableCell>
-                  <TableCell className="hidden md:table-cell text-right font-mono text-sm text-muted-foreground">
-                    {formatTokens(row.tokensOut)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-sm">
+                  <TableCell className={cn(CELL_CLASS, NUMERIC_CLASS)}>
                     {formatCost(row.costUsd)}
                   </TableCell>
                 </TableRow>

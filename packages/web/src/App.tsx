@@ -9,6 +9,8 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { ImpersonationBar } from "./components/ImpersonationBar";
 import { AppLayout } from "./components/layout";
 import { Login } from "./pages/Login";
+import { LoginEmail } from "./pages/LoginEmail";
+import { SignUp } from "./pages/SignUp";
 import { AuthCallback } from "./pages/AuthCallback";
 import { AuthIframeCallback } from "./pages/AuthIframeCallback";
 import { AuthPopupCallback } from "./pages/AuthPopupCallback";
@@ -82,6 +84,8 @@ function App() {
               <Routes>
                 {/* Public routes */}
                 <Route path={AppRoutes.login} element={<Login />} />
+                <Route path={AppRoutes.loginEmail} element={<LoginEmail />} />
+                <Route path={AppRoutes.signup} element={<SignUp />} />
                 <Route path={AppRoutes.authCallback} element={<AuthCallback />} />
                 <Route path={AppRoutes.authSilentCallback} element={<AuthSilentCallback />} />
                 <Route path={AppRoutes.authIframeCallback} element={<AuthIframeCallback />} />

@@ -154,6 +154,49 @@ describe("processHooksQueue — full success", () => {
     expect(result.sent).toBe(1);
     expect(result.skipped).toBe(1);
   });
+
+  it("threads allowInsecureHttp through to postEvent", async () => {
+    const queuePath = join(appDir, "hooks-queue.ndjson");
+    writeFileSync(queuePath, FIXTURE_SESSION_END + "\n", "utf-8");
+    mockPostEvent.mockResolvedValue(true);
+
+    await processHooksQueue({
+      queuePath,
+      state: emptyState(),
+      host: "http://trusted-staging.example",
+      token: "tok",
+      allowInsecureHttp: true,
+      on429: () => {},
+    });
+
+    expect(mockPostEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      "http://trusted-staging.example",
+      "tok",
+      expect.objectContaining({ allowInsecureHttp: true })
+    );
+  });
+
+  it("defaults allowInsecureHttp to false when not specified", async () => {
+    const queuePath = join(appDir, "hooks-queue.ndjson");
+    writeFileSync(queuePath, FIXTURE_SESSION_END + "\n", "utf-8");
+    mockPostEvent.mockResolvedValue(true);
+
+    await processHooksQueue({
+      queuePath,
+      state: emptyState(),
+      host: "http://localhost:3000",
+      token: "tok",
+      on429: () => {},
+    });
+
+    expect(mockPostEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      "http://localhost:3000",
+      "tok",
+      expect.objectContaining({ allowInsecureHttp: false })
+    );
+  });
 });
 
 describe("processHooksQueue — partial failure", () => {

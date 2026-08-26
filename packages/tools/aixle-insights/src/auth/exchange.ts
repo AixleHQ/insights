@@ -1,3 +1,18 @@
+export interface OrgOption {
+  id: string;
+  name: string;
+  role: string;
+}
+
+export class OrganizationSelectionRequiredError extends Error {
+  readonly organizations: OrgOption[];
+  constructor(message: string, organizations: OrgOption[]) {
+    super(message);
+    this.name = "OrganizationSelectionRequiredError";
+    this.organizations = organizations;
+  }
+}
+
 export interface ExchangeAccount {
   ingestToken: string;
 }
@@ -64,6 +79,21 @@ export async function exchangeIngestToken(params: {
     throw new Error(`Aixle Insights exchange: invalid JSON (HTTP ${res.status}): ${text.slice(0, 200)}`);
   }
   if (!res.ok) {
+    const errBody = json as Record<string, unknown>;
+    if (errBody["error"] === "organization_selection_required") {
+      const rawOrgs = Array.isArray(errBody["organizations"]) ? errBody["organizations"] : [];
+      // Defensive: skip null/non-object elements so a malformed server body cannot crash init.
+      const orgs: OrgOption[] = rawOrgs
+        .filter((o): o is Record<string, unknown> => typeof o === "object" && o !== null && !Array.isArray(o))
+        .filter((o) => typeof o["id"] === "string" && typeof o["name"] === "string")
+        .map((o) => ({
+          id: o["id"] as string,
+          name: o["name"] as string,
+          role: String(o["role"] ?? ""),
+        }));
+      const msg = typeof errBody["message"] === "string" ? errBody["message"] : "Organization selection required.";
+      throw new OrganizationSelectionRequiredError(msg, orgs);
+    }
     throw new Error(`Aixle Insights exchange failed (HTTP ${res.status}): ${text.slice(0, 500)}`);
   }
   const root = json as Record<string, unknown>;

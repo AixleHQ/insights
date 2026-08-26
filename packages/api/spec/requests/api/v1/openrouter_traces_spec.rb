@@ -132,6 +132,32 @@ RSpec.describe "Api::V1::OpenrouterTraces", type: :request do
 
         post_trace(token: "unknown-token-that-does-not-exist")
       end
+
+      # AIX-716. The 64-char canary matters: the previous log line wrote
+      # params[:webhook_token]&.first(8), so an 8-char assertion needs a token long
+      # enough for a prefix to be distinguishable from the whole value.
+      let(:canary_token) { "CANARY716".ljust(64, "a") }
+
+      it "logs no part of the token, and correlates on the request id instead" do
+        logged = []
+        allow(Rails.logger).to receive(:warn) { |message| logged << message.to_s }
+
+        post_trace(token: canary_token)
+
+        line = logged.find { |message| message.include?("[OpenrouterTraces]") }
+
+        expect(line).to be_present
+        expect(line).not_to include(canary_token)
+        expect(line).not_to include(canary_token.first(8))
+        # Matched, not `include("request_id=")` — that substring is present even when
+        # request_id is nil, so the weaker form cannot fail for the reason it exists.
+        expect(line).to match(/request_id=[0-9a-f-]{8,}/)
+
+        # The response contract this change must not disturb: 200 so OpenRouter
+        # does not retry an unknown-token payload.
+        expect(response).to have_http_status(:ok)
+        expect(json_response[:received]).to be true
+      end
     end
 
     context "when the payload is malformed JSON" do

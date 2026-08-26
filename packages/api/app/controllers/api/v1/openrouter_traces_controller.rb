@@ -37,7 +37,12 @@ module Api
 
         unless connector
           # Return 200 so OpenRouter doesn't retry unknown-token payloads.
-          Rails.logger.warn("[OpenrouterTraces] No active connector found for webhook_token=#{params[:webhook_token]&.first(8)}...")
+          # AIX-716: log nothing derived from :webhook_token — it is the sole
+          # authenticator for this endpoint, which is JWT-excluded and therefore
+          # reachable unauthenticated, so any caller can drive this line at will.
+          # request_id is unique per request and safe to write, which keeps the
+          # line useful for correlating a burst without disclosing a credential.
+          Rails.logger.warn("[OpenrouterTraces] No active connector for the supplied webhook token (request_id=#{request.request_id})")
           return render json: { received: true }, status: :ok
         end
 

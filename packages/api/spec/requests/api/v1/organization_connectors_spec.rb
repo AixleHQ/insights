@@ -480,6 +480,20 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       expect(connector.reload.status).to eq('connected')
     end
 
+    it 'does not refresh last_sync_at on success (preserves staleness)' do
+      prior_sync = 10.hours.ago
+      connector.update_columns(last_sync_at: prior_sync)
+      allow_any_instance_of(Oauth::GithubProvider).to receive(:test_connection)
+        .and_return({ success: true, account: 'testuser', name: 'Test User' })
+
+      authenticated_post "/api/v1/organizations/#{organization.id}/connectors/#{connector.id}/test",
+                         user: admin,
+                         organization: organization
+
+      expect_success
+      expect(connector.reload.last_sync_at).to be_within(1.second).of(prior_sync)
+    end
+
     it 'marks connector as error on failure' do
       allow_any_instance_of(Oauth::GithubProvider).to receive(:test_connection)
         .and_return({ success: false, error: 'Token expired' })
@@ -1200,6 +1214,98 @@ RSpec.describe 'Api::V1::OrganizationConnectors', type: :request do
       expect(summary[:error]).to eq(1)
       expect(summary[:disconnected]).to eq(1)
       expect(summary[:testing]).to eq(0)
+      expect(summary).to include(:stale, :stuck, :healthy)
+    end
+
+    context 'health overlays (stale / stuck / healthy)' do
+      # Skip live probing so connected connectors keep the status/timestamps we set below.
+      before { allow(ConnectorConnectionProbe).to receive(:call) { |c| c } }
+
+      it 'flags a connected AI connector whose last_sync_at exceeds its interval as stale' do
+        ai = create(:organization_connector, organization: organization, connector_type: 'anthropic',
+                    status: 'connected')
+        ai.update_columns(last_sync_at: 10.hours.ago)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/connectors/health",
+                          user: admin, organization: organization
+
+        expect_success
+        expect(json_response.dig(:data, :summary)[:stale]).to eq(1)
+        ai_data = json_response.dig(:data, :connectors).find { |c| c[:connector_type] == 'anthropic' }
+        expect(ai_data[:stale]).to be(true)
+      end
+
+      it 'does not flag an event-driven connector with an old last_sync_at as stale' do
+        connector.update_columns(last_sync_at: 30.days.ago)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/connectors/health",
+                          user: admin, organization: organization
+
+        expect_success
+        expect(json_response.dig(:data, :summary)[:stale]).to eq(0)
+        gh_data = json_response.dig(:data, :connectors).find { |c| c[:connector_type] == 'github' }
+        expect(gh_data[:stale]).to be(false)
+      end
+
+      it 'does not flag a webhook-active OpenRouter connector with an old last_sync_at as stale' do
+        openrouter = create(:organization_connector, organization: organization, connector_type: 'openrouter',
+                            status: 'connected', webhook_active: true)
+        openrouter.update_columns(last_sync_at: 10.hours.ago)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/connectors/health",
+                          user: admin, organization: organization
+
+        expect_success
+        expect(json_response.dig(:data, :summary)[:stale]).to eq(0)
+        or_data = json_response.dig(:data, :connectors).find { |c| c[:connector_type] == 'openrouter' }
+        expect(or_data[:stale]).to be(false)
+      end
+
+      it 'flags a connector stuck in testing beyond the timeout' do
+        stuck = create(:organization_connector, organization: organization, connector_type: 'jira',
+                       status: 'testing')
+        stuck.update_columns(testing_started_at: 2.hours.ago)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/connectors/health",
+                          user: admin, organization: organization
+
+        expect_success
+        summary = json_response.dig(:data, :summary)
+        expect(summary[:stuck]).to eq(1)
+        expect(summary[:testing]).to eq(1)
+        stuck_data = json_response.dig(:data, :connectors).find { |c| c[:connector_type] == 'jira' }
+        expect(stuck_data[:stuck]).to be(true)
+      end
+
+      it 'does not flag a recently started testing connector as stuck' do
+        recent = create(:organization_connector, organization: organization, connector_type: 'jira',
+                        status: 'testing')
+        recent.update_columns(testing_started_at: 5.minutes.ago)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/connectors/health",
+                          user: admin, organization: organization
+
+        expect_success
+        summary = json_response.dig(:data, :summary)
+        expect(summary[:stuck]).to eq(0)
+        expect(summary[:testing]).to eq(1)
+      end
+
+      it 'counts a freshly synced connected connector as healthy' do
+        fresh = create(:organization_connector, organization: organization, connector_type: 'anthropic',
+                       status: 'connected')
+        fresh.update_columns(last_sync_at: 5.minutes.ago)
+
+        authenticated_get "/api/v1/organizations/#{organization.id}/connectors/health",
+                          user: admin, organization: organization
+
+        expect_success
+        fresh_data = json_response.dig(:data, :connectors).find { |c| c[:connector_type] == 'anthropic' }
+        expect(fresh_data[:stale]).to be(false)
+        expect(fresh_data[:stuck]).to be(false)
+        # base github connector + fresh anthropic are both healthy
+        expect(json_response.dig(:data, :summary)[:healthy]).to eq(2)
+      end
     end
 
     it 'returns per-connector list excluding disconnected connectors' do

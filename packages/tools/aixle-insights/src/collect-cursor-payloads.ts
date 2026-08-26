@@ -41,6 +41,7 @@ export interface PrepareCursorSliceGroupsOptions {
   host?: string;
   token?: string;
   projectLookupToken?: string | null;
+  allowInsecureHttp?: boolean;
   verbose?: boolean;
   cursorBaseDir?: string;
   cursorTranscriptProjectDirs?: string[];
@@ -94,6 +95,7 @@ export async function prepareCursorSliceGroups(
     host,
     token,
     projectLookupToken,
+    allowInsecureHttp,
     verbose = false,
     cursorBaseDir,
     cursorTranscriptProjectDirs,
@@ -117,7 +119,9 @@ export async function prepareCursorSliceGroups(
   }
 
   const baseDir = cursorBaseDir;
-  const activeModel = readCursorActiveModel(baseDir) ?? undefined;
+  const activeModelResolution = readCursorActiveModel(baseDir);
+  const activeModel = activeModelResolution.model ?? undefined;
+  const modelResolution = activeModelResolution.source;
   const transcriptTurns = await readCursorTranscriptSessions(baseDir, cursorTranscriptProjectDirs, verbose);
   const rawEvents = readCursorEvents(eventsSince, baseDir, verbose);
   const { raw: dailyStatsRaw, deduped: dailyStats } = readDailyStatsWithDedupe(
@@ -138,7 +142,7 @@ export async function prepareCursorSliceGroups(
       if (known.contentHash && turn.contentHash) return known.contentHash !== turn.contentHash;
       return known.fileSize !== turn.fileSize;
     })
-    .map((turn) => mapCursorTranscriptTurn(turn, projectIdOpt, cursorPricing, activeModel))
+    .map((turn) => mapCursorTranscriptTurn(turn, projectIdOpt, cursorPricing, activeModel, modelResolution))
     .sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
   const skippedTranscriptCount = transcriptTurns.length - transcriptPayloads.length;
   const transcriptModeEnabled = transcriptTurnsById.size > 0;
@@ -147,7 +151,7 @@ export async function prepareCursorSliceGroups(
     .map(({ row, workspacePath }) => mapCursorEvent(row, workspacePath, projectIdOpt, cursorPricing))
     .filter((e): e is CursorDb90Payload => e !== null);
   const allMappedFromStats = dailyStats
-    .flatMap((entry) => mapDailyStats(entry, projectIdOpt, cursorPricing, activeModel));
+    .flatMap((entry) => mapDailyStats(entry, projectIdOpt, cursorPricing, activeModel, modelResolution));
 
   // When transcripts are present they cover the same chat activity — suppress the daily aggregates
   // to prevent double-counting. Logged at info level in sync.ts via counts.suppressedComposer.
@@ -163,7 +167,7 @@ export async function prepareCursorSliceGroups(
     : 0;
 
   let mappedFromCommits = recentCommitSnapshots
-    .map((snapshot) => mapRecentCommit(snapshot, projectIdOpt, cursorPricing, activeModel))
+    .map((snapshot) => mapRecentCommit(snapshot, projectIdOpt, cursorPricing, activeModel, modelResolution))
     .filter((payload): payload is CursorDb90Payload => payload !== null)
     .sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
 
@@ -181,6 +185,7 @@ export async function prepareCursorSliceGroups(
         projectIdSource,
         host,
         token: lookupToken,
+        allowInsecureHttp,
         verbose,
       });
     }

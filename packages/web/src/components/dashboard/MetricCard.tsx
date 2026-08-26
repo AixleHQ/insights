@@ -85,7 +85,9 @@ export function MetricCard({
       <CardContent className="px-6 py-0">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 space-y-2">
-            <p className="type-label text-muted-foreground">{resolvedLabel}</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {resolvedLabel}
+            </p>
             <div className="flex min-w-0 flex-wrap items-baseline gap-2">
               <p
                 className={cn(

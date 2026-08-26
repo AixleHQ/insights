@@ -16,7 +16,12 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProviderLogo } from "@/components/icons";
 import type { ProviderInfo } from "./IntegrationCard";
-import { buildAixleInsightsInitCommand } from "@/lib/aixle-cli";
+import {
+  buildAixleInsightsInitCommand,
+  defaultAixleChannel,
+  isAixleChannelSelectable,
+  type AixleChannel,
+} from "@/lib/aixle-cli";
 
 interface IngestTokenConnectSheetProps {
   provider: ProviderInfo | null;
@@ -78,9 +83,76 @@ function buildClaudeCodeSettingsSnippet(token: string): string {
 }`;
 }
 
+/**
+ * Stable / Staging selector for the npm release channel (AIX-614).
+ *
+ * Only the npm package spec differs today — both channels target the environment
+ * serving this sheet. See `resolveAixleChannelTarget` for why host is duplicated
+ * rather than hoisted.
+ *
+ * Renders nothing on production (AIX-618): production users always want stable, so
+ * the control and its explanatory copy are removed outright rather than disabled — a
+ * disabled toggle still makes the reader stop and consider a choice they don't have.
+ * The surrounding `init` instructions already say everything they need.
+ *
+ * Callers keep passing `channel`/`onChange` unconditionally; the state defaults to
+ * `stable` on production anyway, so with the control gone the value simply never changes.
+ */
+function ChannelSelector({
+  channel,
+  onChange,
+}: {
+  channel: AixleChannel;
+  onChange: (next: AixleChannel) => void;
+}) {
+  if (!isAixleChannelSelectable()) return null;
+
+  // Deliberately NOT a Tabs control: this is a mutually-exclusive choice, not tabbed
+  // panels, so radiogroup is the correct role. It also keeps the Cursor path free of
+  // `role="tab"` elements, which a test asserts (that path has no MCP/hooks tabs).
+  return (
+    <div className="space-y-1.5">
+      <div
+        role="radiogroup"
+        aria-label="npm release channel"
+        className="inline-flex rounded-md border p-0.5 gap-0.5"
+      >
+        {(["stable", "staging"] as const).map((value) => (
+          <Button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={channel === value}
+            variant={channel === value ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => onChange(value)}
+            className="text-xs h-auto py-1 px-2.5"
+          >
+            {value === "stable" ? "Stable" : "Staging"}
+          </Button>
+        ))}
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        {channel === "stable" ? (
+          <>
+            <strong>Stable</strong> is what everyone runs — a plain version with no suffix.
+          </>
+        ) : (
+          <>
+            <strong>Staging</strong> installs an unreleased QA build (version ends in{" "}
+            <code className="bg-muted px-1 rounded">-staging</code>). It may change or break
+            without notice.
+          </>
+        )}
+      </p>
+    </div>
+  );
+}
+
 function ClaudeCodeSetupInstructions({ token }: { token: string }) {
   const [copiedInit, setCopiedInit] = useState(false);
   const [copiedSettings, setCopiedSettings] = useState(false);
+  const [channel, setChannel] = useState<AixleChannel>(defaultAixleChannel);
   const initTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const settingsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -89,7 +161,7 @@ function ClaudeCodeSetupInstructions({ token }: { token: string }) {
     if (settingsTimerRef.current) clearTimeout(settingsTimerRef.current);
   }, []);
 
-  const initCommand = buildAixleInsightsInitCommand();
+  const initCommand = buildAixleInsightsInitCommand(channel);
   const settingsSnippet = buildClaudeCodeSettingsSnippet(token);
 
   const handleCopyInit = async () => {
@@ -125,6 +197,7 @@ function ClaudeCodeSetupInstructions({ token }: { token: string }) {
         </TabsList>
 
         <TabsContent value="mcp-recommended" className="space-y-2 pt-2">
+          <ChannelSelector channel={channel} onChange={setChannel} />
           <p className="text-xs text-muted-foreground">
             One-time Keycloak device login installs the MCP entry in <code className="bg-muted px-1 rounded whitespace-pre-wrap break-all">~/.claude.json</code>.
             Omit <code className="bg-muted px-1 rounded">--tool-name</code> during <code className="bg-muted px-1 rounded">init</code> so both Claude Code and Cursor accounts can auto-forward telemetry when Integration Connect has provisioned them — no pasted ingest token needed for this path.
@@ -180,13 +253,14 @@ function ClaudeCodeSetupInstructions({ token }: { token: string }) {
 
 function CursorSetupInstructions() {
   const [copiedInit, setCopiedInit] = useState(false);
+  const [channel, setChannel] = useState<AixleChannel>(defaultAixleChannel);
   const initTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
     if (initTimerRef.current) clearTimeout(initTimerRef.current);
   }, []);
 
-  const initCommand = buildAixleInsightsInitCommand();
+  const initCommand = buildAixleInsightsInitCommand(channel);
 
   const handleCopyInit = async () => {
     try {
@@ -199,10 +273,11 @@ function CursorSetupInstructions() {
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
+      <ChannelSelector channel={channel} onChange={setChannel} />
       <p className="text-xs text-muted-foreground">
         One-time Keycloak device login stores credentials in{" "}
-        <code className="bg-muted px-1 rounded whitespace-pre-wrap break-all">~/.aixle-mcp</code>.
+        <code className="bg-muted px-1 rounded whitespace-pre-wrap break-all">~/.aixle-insights</code>.
         After provisioning Cursor through this sheet, run{" "}
         <code className="bg-muted px-1 rounded">init</code> — add{" "}
         <code className="bg-muted px-1 rounded">--tool-name cursor</code> if you only use Cursor

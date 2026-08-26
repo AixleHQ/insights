@@ -92,11 +92,24 @@ const TOOL_NAME_MAP: Record<string, string> = {
   "openai_api": "OpenAI API",
   "openrouter_api": "OpenRouter API",
   "gemini_api": "Gemini API",
+  // Pre-staged for AIX-509 (Bedrock connector); not yet in ToolEvent::TOOL_NAMES.
+  "bedrock_api": "Bedrock API",
   "anthropic": "Anthropic",
   "anthropic_api": "Anthropic API",
   "jira": "Jira",
   "linear": "Linear",
+  "custom": "Custom",
 };
+
+/**
+ * Whether `slug` has an explicit curated label in `TOOL_NAME_MAP` (vs. the
+ * Title-case fallback). Testable surface for the label-drift guard: single-word
+ * slugs like `custom` humanize identically with or without a map entry, so map
+ * membership must be checked directly.
+ */
+export function hasCuratedToolLabel(slug: string): boolean {
+  return Object.prototype.hasOwnProperty.call(TOOL_NAME_MAP, slug.toLowerCase().trim());
+}
 
 /**
  * Map a ToolEvent API response to the EventRow shape expected by EventsTable.

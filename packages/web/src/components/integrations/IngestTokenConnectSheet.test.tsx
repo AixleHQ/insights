@@ -1,9 +1,19 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { IngestTokenConnectSheet } from "./IngestTokenConnectSheet";
 import { ApiError } from "@/lib/api";
 import type { ProviderInfo } from "./IntegrationCard";
+
+// Only the environment predicate is stubbed — every other channel behaviour stays real.
+// The predicate's own logic (APP_ENV, Keycloak-host inference, fail-open) is covered
+// directly in src/lib/aixle-cli.test.ts. Defaults to true, matching a dev/test box.
+const channelEnv = vi.hoisted(() => ({ selectable: true }));
+
+vi.mock("@/lib/aixle-cli", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/aixle-cli")>();
+  return { ...actual, isAixleChannelSelectable: () => channelEnv.selectable };
+});
 
 vi.mock("@/contexts/OrgContext", () => ({
   useOrg: () => ({
@@ -173,6 +183,114 @@ describe("IngestTokenConnectSheet", () => {
       expect(screen.getByLabelText(/Recommended MCP install command/i)).toHaveTextContent(
         /npx -y @aixle\/insights init --host http:\/\/localhost:3000 --keycloak-url http:\/\/localhost:8080\/realms\/db90/,
       );
+    });
+
+    it("offers a Stable/Staging channel selector and defaults to Stable on localhost", async () => {
+      await goToSetupStep(claudeCodeProvider);
+      const group = screen.getByRole("radiogroup", { name: /npm release channel/i });
+      expect(group).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Stable" })).toHaveAttribute(
+        "aria-checked",
+        "true",
+      );
+      expect(screen.getByRole("radio", { name: "Staging" })).toHaveAttribute(
+        "aria-checked",
+        "false",
+      );
+    });
+
+    it("switching to Staging changes the package spec in the init command", async () => {
+      const user = userEvent.setup();
+      await goToSetupStep(claudeCodeProvider);
+
+      const command = () =>
+        screen.getByLabelText(/Recommended MCP install command/i).textContent ?? "";
+
+      expect(command()).toContain("npx -y @aixle/insights init");
+      expect(command()).not.toContain("@aixle/insights@staging");
+
+      await user.click(screen.getByRole("radio", { name: "Staging" }));
+      expect(command()).toContain("npx -y @aixle/insights@staging init");
+
+      await user.click(screen.getByRole("radio", { name: "Stable" }));
+      expect(command()).toContain("npx -y @aixle/insights init");
+      expect(command()).not.toContain("@aixle/insights@staging");
+    });
+
+    // Asserts the CURRENT phase: production is not live, so both channels target the
+    // environment serving the sheet and differ only by npm package. When `stable` is
+    // repointed at production this SHOULD fail — that is the signal to update the
+    // production target, not a regression.
+    it("keeps --host and --keycloak-url identical across channels (pre-production)", async () => {
+      const user = userEvent.setup();
+      await goToSetupStep(claudeCodeProvider);
+
+      const flagsOf = () => {
+        const text = screen.getByLabelText(/Recommended MCP install command/i).textContent ?? "";
+        return text.slice(text.indexOf("--host"));
+      };
+
+      const stableFlags = flagsOf();
+      await user.click(screen.getByRole("radio", { name: "Staging" }));
+      expect(flagsOf()).toBe(stableFlags);
+    });
+
+    it("offers the channel selector on the cursor path too, without introducing tabs", async () => {
+      await goToSetupStep(cursorProvider);
+      expect(
+        screen.getByRole("radiogroup", { name: /npm release channel/i }),
+      ).toBeInTheDocument();
+      // The cursor path deliberately has no MCP/hooks tabs; the channel control is a
+      // radiogroup, not a Tabs list, so this must still hold.
+      expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    });
+
+    // AIX-618 QA feedback: production users always want the stable build, so the
+    // choice is noise there. Removed outright rather than disabled — a disabled toggle
+    // still makes the reader weigh a decision they don't have.
+    describe("on production", () => {
+      beforeEach(() => {
+        channelEnv.selectable = false;
+      });
+
+      afterEach(() => {
+        channelEnv.selectable = true;
+      });
+
+      it("hides the channel control and its explanatory copy on the claude-code path", async () => {
+        await goToSetupStep(claudeCodeProvider);
+
+        expect(
+          screen.queryByRole("radiogroup", { name: /npm release channel/i }),
+        ).not.toBeInTheDocument();
+        expect(screen.queryByRole("radio", { name: "Stable" })).not.toBeInTheDocument();
+        expect(screen.queryByRole("radio", { name: "Staging" })).not.toBeInTheDocument();
+        expect(screen.queryByText(/is what everyone runs/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/installs an unreleased QA build/i)).not.toBeInTheDocument();
+      });
+
+      it("hides the channel control on the cursor path too", async () => {
+        await goToSetupStep(cursorProvider);
+        expect(
+          screen.queryByRole("radiogroup", { name: /npm release channel/i }),
+        ).not.toBeInTheDocument();
+      });
+
+      // The point of hiding the control: what remains must still be a complete,
+      // runnable setup path, and it must be the stable build.
+      it("still shows the install instructions, the stable command and the copy button", async () => {
+        await goToSetupStep(claudeCodeProvider);
+
+        expect(screen.getByText(/One-time Keycloak device login/i)).toBeInTheDocument();
+
+        const command = screen.getByLabelText(/Recommended MCP install command/i).textContent ?? "";
+        expect(command).toContain("npx -y @aixle/insights init");
+        expect(command).not.toContain("@aixle/insights@staging");
+        expect(command).toContain("--host");
+        expect(command).toContain("--keycloak-url");
+
+        expect(screen.getAllByRole("button", { name: /copy/i }).length).toBeGreaterThan(0);
+      });
     });
 
     it("does not offer a Standalone CLI tab for claude-code", async () => {

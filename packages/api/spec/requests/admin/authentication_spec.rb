@@ -123,10 +123,20 @@ RSpec.describe 'Admin Authentication', type: :request do
   describe 'logout (DELETE /admin/logout)' do
     let(:admin_user) { create(:user, :global_admin) }
 
-    it 'terminates the signed-cookie admin session' do
+    # Log in through the real callback so session[:admin_id_token] is populated.
+    # Where the callback enforces an OAuth state check, stub it so these
+    # logout-focused specs stay independent of the login state round-trip.
+    def log_in_admin(id_token: 'the.id.token')
+      if Admin::SessionsController.private_method_defined?(:valid_state?)
+        allow_any_instance_of(Admin::SessionsController).to receive(:valid_state?).and_return(true)
+      end
       allow_any_instance_of(Admin::KeycloakAuthService).to receive(:authenticate)
-        .and_return(Admin::KeycloakAuthService::Result.new(success?: true, user: admin_user, id_token: 'the.id.token'))
-      get '/admin/callback', params: { code: 'irrelevant' }
+        .and_return(Admin::KeycloakAuthService::Result.new(success?: true, user: admin_user, id_token: id_token))
+      get '/admin/callback', params: { code: 'irrelevant', state: 'stubbed' }
+    end
+
+    it 'terminates the signed-cookie admin session' do
+      log_in_admin
       expect(response).to redirect_to('/admin')
 
       get admin_root_path
@@ -141,9 +151,7 @@ RSpec.describe 'Admin Authentication', type: :request do
     end
 
     it 'ends the Keycloak SSO session via RP-initiated logout with id_token_hint' do
-      allow_any_instance_of(Admin::KeycloakAuthService).to receive(:authenticate)
-        .and_return(Admin::KeycloakAuthService::Result.new(success?: true, user: admin_user, id_token: 'the.id.token'))
-      get '/admin/callback', params: { code: 'irrelevant' }
+      log_in_admin
 
       delete '/admin/logout'
 
@@ -175,9 +183,9 @@ RSpec.describe 'Admin Authentication', type: :request do
     end
 
     it 'clears the admin session without Keycloak redirect when Accept is JSON (main-app logout)' do
-      allow_any_instance_of(Admin::KeycloakAuthService).to receive(:authenticate)
-        .and_return(Admin::KeycloakAuthService::Result.new(success?: true, user: admin_user, id_token: 'the.id.token'))
-      get '/admin/callback', params: { code: 'irrelevant' }
+      # Use log_in_admin so OAuth state validation (AIX-563) is stubbed — this
+      # example is about JSON logout behavior, not the login round-trip.
+      log_in_admin
       expect(response).to redirect_to('/admin')
 
       delete '/admin/logout', headers: { 'Accept' => 'application/json' }
@@ -212,10 +220,7 @@ RSpec.describe 'Admin Authentication', type: :request do
       realistic_id_token = "#{header}.#{payload}.#{signature}"
       expect(realistic_id_token.bytesize).to be > 1000
 
-      allow_any_instance_of(Admin::KeycloakAuthService).to receive(:authenticate)
-        .and_return(Admin::KeycloakAuthService::Result.new(success?: true, user: admin_user, id_token: realistic_id_token))
-
-      get '/admin/callback', params: { code: 'irrelevant' }
+      log_in_admin(id_token: realistic_id_token)
       expect(response).to redirect_to('/admin')
 
       session_cookie = response.headers['Set-Cookie'].to_s[/_db90_admin_session=[^;]+/]

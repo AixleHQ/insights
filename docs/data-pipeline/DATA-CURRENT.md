@@ -264,7 +264,7 @@ The `SanitizationPolicy` defined in `packages/api/db/seeds.rb:7-35` covers six p
 
 **New policy rules recommended** (captured as sub-task `cursor-7`):
 
-1. `internal_hostname` — regex matching `*.example.com`, `*.db90.io`, and the staging hostnames listed in `.env.example`.
+1. `internal_hostname` — regex matching `*.example.com`, `*.insights.example.com`, and the staging hostnames listed in `.env.example`.
 2. `customer_identifier` — regex matching the org-configurable list of customer codenames (or a hash thereof). Tenant-scoped.
 3. **Field-level allow-listing** — for cursor-side metadata, only the keys enumerated in `Db90PayloadMetadata` should be accepted; unknown keys should be dropped server-side rather than persisted. Today `ingest_controller.rb:127-133` uses `params.permit(... metadata: {})`, which accepts any nested structure. Tightening this means the policy is enforceable at ingest, not just at scan time.
 

@@ -44,10 +44,6 @@ module Api
         }
       rescue ActiveRecord::RecordNotFound
         render json: { error: "Connector not found" }, status: :not_found
-      rescue Webhooks::SignatureInvalidError => e
-        render json: { error: "Invalid signature", message: e.message }, status: :unauthorized
-      rescue Webhooks::SignatureMissingError => e
-        render json: { error: "Missing signature", message: e.message }, status: :bad_request
       rescue StandardError => e
         Rails.logger.error "[Webhooks] Processing failed: #{e.message}"
         render json: { error: "Processing failed", message: e.message }, status: :unprocessable_content
@@ -55,6 +51,9 @@ module Api
 
       private
 
+      # Failure handling lives here (not split across this method + #receive's rescue chain):
+      # this runs as a before_action, so exceptions raised here never reach #receive's own
+      # rescue clauses — #receive's stack frame doesn't exist yet when this method runs.
       def verify_signature!
         provider     = params[:provider]
         connector_id = params[:connector_id]
@@ -62,9 +61,7 @@ module Api
         connector = OrganizationConnector.find_by(id: connector_id)
         return render json: { error: "Connector not found" }, status: :not_found unless connector
 
-        secret = connector.webhook_secret
-        return if secret.blank?
-
+        secret    = connector.webhook_secret
         verifier  = Webhooks::SignatureVerifier.for(provider)
         signature = verifier.extract_signature(request)
 
@@ -73,6 +70,12 @@ module Api
           signature: signature,
           secret:    secret
         )
+      rescue Webhooks::SignatureInvalidError => e
+        render json: { error: "Invalid signature", message: e.message }, status: :unauthorized
+      rescue Webhooks::SignatureMissingError => e
+        render json: { error: "Missing signature", message: e.message }, status: :bad_request
+      rescue ArgumentError => e
+        render json: { error: "Unknown provider", message: e.message }, status: :bad_request
       end
 
       def parse_payload

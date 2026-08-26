@@ -279,6 +279,12 @@ RSpec.describe 'Api::V1::Ingest', type: :request do
         ingest_post
         expect(response).to have_http_status(:unauthorized)
       end
+
+      it 'returns 401 when the organization has been deactivated' do
+        organization.update!(is_active: false)
+        ingest_post
+        expect(response).to have_http_status(:unauthorized)
+      end
     end
 
     context 'when Temporal workflow fails' do

@@ -27,6 +27,8 @@ interface ActivityData {
 interface ActivityHeatmapProps {
   data: ActivityData[];
   className?: string;
+  /** When "last_year", header shows "X events in the last year" (Figma Member dashboard). */
+  summaryMode?: "default" | "last_year";
 }
 
 const DAYS_OF_WEEK_FULL = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -155,7 +157,7 @@ function calculateWeeksToShow(containerWidth: number): number {
   return Math.max(12, Math.min(53, maxWeeks));
 }
 
-export function ActivityHeatmap({ data, className }: ActivityHeatmapProps) {
+export function ActivityHeatmap({ data, className, summaryMode = "default" }: ActivityHeatmapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [weeksToShow, setWeeksToShow] = useState(53);
   const [isCompact, setIsCompact] = useState(false);
@@ -264,14 +266,23 @@ export function ActivityHeatmap({ data, className }: ActivityHeatmapProps) {
     <div ref={containerRef} className={cn("rounded-xl border bg-card p-4 sm:p-6", className)}>
       {/* Header - stacks on mobile */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 mb-4 sm:mb-6">
-        <div className="flex items-center gap-2">
-          <Activity className="size-4 sm:size-5 text-primary" />
-          <span className="font-semibold text-sm sm:text-base">Activity</span>
-        </div>
+        {summaryMode === "last_year" ? (
+          <p className="font-semibold text-sm sm:text-base">
+            <span className="text-foreground">{formatCount(totalEvents)}</span>
+            <span className="text-muted-foreground"> events in the last year</span>
+          </p>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Activity className="size-4 sm:size-5 text-primary" />
+            <span className="font-semibold text-sm sm:text-base">Activity</span>
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-xs sm:text-sm text-muted-foreground">
-          <span>
-            <span className="text-foreground font-medium">{formatCount(totalEvents)}</span> events
-          </span>
+          {summaryMode === "default" && (
+            <span>
+              <span className="text-foreground font-medium">{formatCount(totalEvents)}</span> events
+            </span>
+          )}
           {totalTokens > 0 && (
             <span>
               <span className="text-foreground font-medium">{formatTokens(totalTokens)}</span> tokens

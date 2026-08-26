@@ -356,6 +356,16 @@ describe("mapDailyStats", () => {
     expect(results.every((r) => r.model === "claude-4-sonnet")).toBe(true);
   });
 
+  it("stamps model_resolution metadata when provided", () => {
+    const entry: DailyStatsEntry = {
+      date: "2026-05-20",
+      value: { tabSuggestedLines: 5, tabAcceptedLines: 2 },
+      dbPath: "/tmp/state.vscdb",
+    };
+    const results = mapDailyStats(entry, undefined, DEFAULT_CURSOR_PRICING, "claude-4-sonnet", "state_vscdb");
+    expect(results[0].metadata.model_resolution).toBe("state_vscdb");
+  });
+
   it("defaults model to unknown when not provided", () => {
     const entry: DailyStatsEntry = {
       date: "2026-04-15",
@@ -452,6 +462,27 @@ describe("mapTranscriptTurn", () => {
     expect(payload.model).toBe("claude-sonnet-4-6");
   });
 
+  it("stamps model_resolution metadata when provided", () => {
+    const turn: CursorTranscriptTurn = {
+      turnId: "t1",
+      sessionId: "s1",
+      filePath: "/tmp/session.jsonl",
+      fileSize: 100,
+      workspacePath: "/repo",
+      tokensIn: 10,
+      tokensOut: 5,
+      occurredAt: "2026-05-20T10:00:00.000Z",
+      riskLevel: "none" as const,
+      riskCategories: [],
+      riskScore: 0,
+      composerName: null,
+      promptText: "",
+      assistantText: "",
+    };
+    const payload = mapTranscriptTurn(turn, undefined, DEFAULT_CURSOR_PRICING, "claude-sonnet-4-6", "settings_json");
+    expect(payload.metadata.model_resolution).toBe("settings_json");
+  });
+
   it("defaults transcript turn model to unknown when not provided", () => {
     const turn: CursorTranscriptTurn = {
       turnId: "composer-789:1",
@@ -534,6 +565,15 @@ describe("mapRecentCommit", () => {
     const result = mapRecentCommit(snapshot, undefined, DEFAULT_CURSOR_PRICING, "claude-4-sonnet");
     expect(result).not.toBeNull();
     expect(result!.model).toBe("claude-4-sonnet");
+  });
+
+  it("stamps model_resolution metadata when provided", () => {
+    const snapshot: RecentCommitSnapshot = {
+      dbPath,
+      value: { timestamp: 1716215400000, commitHash: "deadbeef", linesAdded: 8, linesDeleted: 2 },
+    };
+    const result = mapRecentCommit(snapshot, undefined, DEFAULT_CURSOR_PRICING, "claude-4-sonnet", "unresolved");
+    expect(result?.metadata.model_resolution).toBe("unresolved");
   });
 
   it("defaults model to unknown when not provided", () => {

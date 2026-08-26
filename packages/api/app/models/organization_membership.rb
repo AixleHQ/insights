@@ -11,6 +11,10 @@ class OrganizationMembership < ApplicationRecord
   validate :cannot_downgrade_last_owner, on: :update, if: :role_changed?
 
   before_destroy :ensure_not_last_owner
+  # Org membership has no DB cascade onto project memberships, so removal paths that
+  # bypass OrganizationMembershipRemovalService (Administrate admin panel, console)
+  # would otherwise leave orphaned project_memberships granting stale access (AIX-611).
+  after_destroy :remove_org_project_memberships
 
   scope :owners, -> { where(role: "owner") }
   scope :admins, -> { where(role: "owner") } # post-AIX-201: admin removed; admins scope == owners
@@ -30,6 +34,15 @@ class OrganizationMembership < ApplicationRecord
   end
 
   private
+
+  # delete_all bypasses ProjectMembership#ensure_not_last_owner intentionally: guaranteed
+  # removal is the goal, and org owners retain implicit project ownership via
+  # ProjectPolicy#project_owner?, so an org project is never truly left orphaned.
+  def remove_org_project_memberships
+    ProjectMembership
+      .where(user_id: user_id, project_id: organization.projects.select(:id))
+      .delete_all
+  end
 
   def ensure_not_last_owner
     return if organization.being_destroyed

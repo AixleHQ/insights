@@ -1,4 +1,5 @@
 import { createReadStream, statSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { finished } from "node:stream/promises";
 import { createInterface } from "node:readline";
 import { join } from "node:path";
@@ -32,6 +33,113 @@ interface ClaudeTranscriptLine {
   cwd?: string;
   isMeta?: boolean;
   message?: ClaudeMessage;
+}
+
+export type ClaudeDerivativeEventType = "edit" | "commit" | "test" | "tool_use";
+
+export interface ClaudeToolUseBlock {
+  id?: string;
+  name: string;
+  input?: Record<string, unknown>;
+}
+
+export interface ClaudeCollectedToolUse {
+  id: string;
+  name: string;
+  eventType: ClaudeDerivativeEventType;
+  summary: string;
+}
+
+const NAV_TOOLS = new Set(["Read", "Grep", "Glob", "LS"]);
+const EDIT_TOOLS = new Set(["Edit", "Write", "MultiEdit", "NotebookEdit"]);
+
+function bashCommand(block: ClaudeToolUseBlock): string {
+  const c = block.input?.command;
+  return typeof c === "string" ? c : "";
+}
+
+export function classifyToolUse(block: ClaudeToolUseBlock): ClaudeDerivativeEventType | null {
+  if (NAV_TOOLS.has(block.name)) return null;
+  if (EDIT_TOOLS.has(block.name)) return "edit";
+  if (block.name === "Bash") {
+    const cmd = bashCommand(block);
+    // Require a space or end-of-string after "commit" so "git commit-tree" is not a commit.
+    if (/\bgit\s+commit(\s|$)/.test(cmd)) return "commit";
+    if (/\b(rspec|jest|vitest|pytest|phpunit)\b/i.test(cmd)) return "test";
+  }
+  return "tool_use";
+}
+
+/**
+ * Redacts credential-bearing substrings from a Bash command string before egress.
+ *
+ * Claude events carry `scannable: true`, which causes the server's ClassificationActivity
+ * to take Path 2 (classification_activity.rb:30-44) — trusting the CLI verbatim and
+ * skipping server-side sanitization. This function is the single point of trust for
+ * command strings derived from tool_input.command. Any new pattern that reads from
+ * tool_input.command MUST pass through this function before being emitted. See DATA-CURRENT.md §12.
+ */
+/**
+ * True when an env-var name looks credential-bearing.
+ * Long tokens (SECRET/TOKEN/PASSWORD/…) may appear as substrings; short ones
+ * (KEY/PASS/PWD) must be underscore-delimited segments so "monkey" / "keyboard"
+ * are not redacted.
+ */
+function isSecretEnvName(name: string): boolean {
+  const n = name.toUpperCase();
+  if (/(?:SECRET|TOKEN|PASSWORD|APIKEY|API_KEY)/.test(n)) return true;
+  return /(?:^|_)(?:KEY|PASS|PWD)(?:_|$)/.test(n);
+}
+
+// A credential value that follows a flag or `=`: either a single/double quoted
+// string (which may contain spaces) or an unquoted run of non-space chars.
+const VALUE = String.raw`(?:"[^"]*"|'[^']*'|\S+)`;
+
+// Secret-bearing long-form flags. Matched with either `=` or a space separator,
+// and the value may be quoted (so `--token "secret value"` is fully redacted).
+const SECRET_FLAGS =
+  "password|token|secret|api[-_]?key|access[-_]?key|auth[-_]?key|" +
+  "access-key-id|secret-access-key|service-account-key|client-secret";
+
+export function scrubBashCommand(cmd: string): string {
+  return (
+    cmd
+      // Authorization / Bearer / Basic headers (curl -H, fetch headers, etc.)
+      .replace(/\b(Authorization\s*:\s*)(Bearer|Basic|Token)\s+\S+/gi, "$1$2 [REDACTED]")
+      // Inline env-var assignments carrying secrets (AWS_SECRET_ACCESS_KEY=…, db_password="a b").
+      // Value may be quoted so assignments with spaces inside quotes are fully redacted.
+      // eslint-disable-next-line security/detect-non-literal-regexp
+      .replace(new RegExp(String.raw`\b([A-Za-z_][A-Za-z0-9_]*)\s*=\s*${VALUE}`, "g"), (match, name: string) =>
+        isSecretEnvName(name) ? `${name}=[REDACTED]` : match
+      )
+      // Secret flags in both --flag=value and --flag value forms, quoted or bare.
+      // eslint-disable-next-line security/detect-non-literal-regexp
+      .replace(new RegExp(String.raw`(--(?:${SECRET_FLAGS}))(=|\s+)${VALUE}`, "gi"), "$1$2[REDACTED]")
+      // -p / --password <value> flag-value pairs (value may be quoted)
+      // eslint-disable-next-line security/detect-non-literal-regexp
+      .replace(new RegExp(String.raw`((?:^|\s)-p\s+)${VALUE}`, "g"), "$1[REDACTED]")
+      // AWS CLI --profile (may embed customer identifiers)
+      // eslint-disable-next-line security/detect-non-literal-regexp
+      .replace(new RegExp(String.raw`(--profile\s+)${VALUE}`, "g"), "$1[REDACTED]")
+      // curl | sh / curl | bash patterns (remote code execution)
+      .replace(/\|\s*(sh|bash|zsh|dash)\b/g, "| [SHELL REDACTED]")
+  );
+}
+
+export function summarizeToolUse(block: ClaudeToolUseBlock): string {
+  const input = block.input ?? {};
+  let raw: string;
+  if (typeof input.file_path === "string" && input.file_path.trim()) {
+    raw = `${block.name}: ${input.file_path}`;
+  } else if (typeof input.command === "string" && input.command.trim()) {
+    const scrubbed = scrubBashCommand(input.command.trim().replace(/\s+/g, " "));
+    raw = `${block.name}: ${scrubbed}`;
+  } else if (typeof input.pattern === "string") {
+    raw = `${block.name}: ${scrubBashCommand(input.pattern)}`;
+  } else {
+    raw = block.name;
+  }
+  return raw.length <= 256 ? raw : `${raw.slice(0, 253)}...`;
 }
 
 /** Prompt substrings emitted for local IDE commands — not real user prompts. */
@@ -108,10 +216,20 @@ export interface ClaudeTranscriptTurn {
   riskLevel: RiskLevel;
   riskScore: number;
   riskCategories: string[];
+  toolUses: ClaudeCollectedToolUse[];
+  navToolCalls: number;
+  totalToolCalls: number;
+  /**
+   * Fingerprint of the turn's content (prompt + assistant text + tool-use set).
+   * A turn keeps the same turnId as Claude appends more tool_use blocks to it,
+   * so sync compares this hash to detect appended derivatives and re-emit them
+   * instead of skipping the turn forever on its unchanged id (AIX-259).
+   */
+  contentHash: string;
 }
 
-/** Payload shape expected by the db90 ingest API. */
-export interface Db90Payload extends IngestPayload {
+/** Payload shape for the parent chat turn (carries full token cost). */
+export interface ClaudePayload extends IngestPayload {
   tool_name: "claude_code";
   event_type: "chat";
   model?: string;
@@ -125,7 +243,7 @@ export interface Db90Payload extends IngestPayload {
     session_id: string;
     claude_session_id: string;
     transcript_source: "claude_jsonl";
-    model: string | null;
+    model?: string | null;
     base_input_tokens: number;
     output_tokens: number;
     cache_write_tokens: number;
@@ -136,11 +254,41 @@ export interface Db90Payload extends IngestPayload {
     prompt_text?: string;
     assistant_text?: string;
     scannable: true;
+    cost_model: "token_count";
+    nav_tool_calls: number;
+    total_tool_calls: number;
   };
 }
 
+/** Payload shape for derivative tool-use children (cost_usd: 0, no tokens). */
+export interface ClaudeDerivativePayload extends IngestPayload {
+  tool_name: "claude_code";
+  event_type: ClaudeDerivativeEventType;
+  cost_usd: 0;
+  occurred_at: string;
+  model?: string;
+  project_id?: string;
+  metadata: {
+    session_id: string;
+    claude_session_id: string;
+    transcript_source: "claude_jsonl";
+    cost_model: "derivative";
+    parent_session_id: string;
+    tool_name_inner: string;
+    tool_use_id: string;
+    summary: string;
+    scannable: false;
+    risk_level: "none";
+    risk_categories: string[];
+    risk_score: 0;
+  };
+}
+
+/** Union of all Claude transcript payloads expected by the ingest API. */
+export type ClaudeMappedPayload = ClaudePayload | ClaudeDerivativePayload;
+
 /** Options for mapTranscriptTurn. */
-export interface ToDb90PayloadOptions {
+export interface ToClaudePayloadOptions {
   projectId?: string | null;
   pricing?: PricingTable;
 }
@@ -223,8 +371,32 @@ function newTurn(
     riskLevel: "low",
     riskScore: 0,
     riskCategories: [],
+    toolUses: [],
+    navToolCalls: 0,
+    totalToolCalls: 0,
+    contentHash: "",
     persisted: false,
   };
+}
+
+/**
+ * Stable fingerprint of a turn's emittable content. Includes the tool-use set
+ * (id + name + summary) so appending a tool_use to an already-synced turn
+ * changes the hash and triggers a re-emit (AIX-259).
+ */
+function computeTurnContentHash(turn: ClaudeTranscriptTurn): string {
+  const toolFingerprint = turn.toolUses
+    .map((t) => `${t.id}:${t.eventType}:${t.summary}`)
+    .join("");
+  const material = [
+    turn.model ?? "",
+    turn.tokensIn,
+    turn.tokensOut,
+    turn.promptText,
+    turn.assistantText,
+    toolFingerprint,
+  ].join(" ");
+  return createHash("sha256").update(material).digest("hex").slice(0, 32);
 }
 
 function appendText(existing: string, addition: string): string {
@@ -238,6 +410,43 @@ function enrichTurnRisk(turn: MutableTranscriptTurn): void {
   turn.riskLevel = result.risk_level;
   turn.riskScore = result.risk_score;
   turn.riskCategories = result.risk_categories;
+}
+
+function collectToolUsesFromContent(content: unknown, turn: MutableTranscriptTurn): void {
+  if (!Array.isArray(content)) return;
+
+  let nav = 0;
+  let total = 0;
+  for (const raw of content) {
+    if (typeof raw !== "object" || raw === null) continue;
+    const block = raw as Record<string, unknown>;
+    if (block.type !== "tool_use" || typeof block.name !== "string") continue;
+
+    total += 1;
+    const toolBlock: ClaudeToolUseBlock = {
+      id: typeof block.id === "string" ? block.id : undefined,
+      name: block.name,
+      input:
+        typeof block.input === "object" && block.input !== null
+          ? (block.input as Record<string, unknown>)
+          : undefined,
+    };
+    const eventType = classifyToolUse(toolBlock);
+    if (eventType === null) {
+      nav += 1;
+      continue;
+    }
+
+    const id = toolBlock.id ?? `idx-${turn.toolUses.length}`;
+    turn.toolUses.push({
+      id,
+      name: toolBlock.name,
+      eventType,
+      summary: summarizeToolUse(toolBlock),
+    });
+  }
+  turn.navToolCalls += nav;
+  turn.totalToolCalls += total;
 }
 
 /** Streams a JSONL file and splits Claude transcripts into individual turns. */
@@ -365,6 +574,7 @@ export async function parseTranscriptFile(
 
         const text = extractContentText(entry.message.content).join("\n\n").trim();
         currentTurn.assistantText = appendText(currentTurn.assistantText, text);
+        collectToolUsesFromContent(entry.message.content, currentTurn);
       }
     }
   } catch (err) {
@@ -379,11 +589,17 @@ export async function parseTranscriptFile(
   }
 
   flushCurrentTurn();
-  return finalizedTurns.map(({ persisted: _persisted, ...turn }) => turn);
+  return finalizedTurns.map(({ persisted: _persisted, ...turn }) => ({
+    ...turn,
+    contentHash: computeTurnContentHash(turn),
+  }));
 }
 
-/** Converts a Claude transcript turn to a db90 ingest payload. */
-export function mapTranscriptTurn(turn: ClaudeTranscriptTurn, options?: ToDb90PayloadOptions): Db90Payload {
+/** Converts a Claude transcript turn to parent chat and derivative tool-use payloads. */
+export function mapTranscriptTurn(
+  turn: ClaudeTranscriptTurn,
+  options?: ToClaudePayloadOptions
+): ClaudeMappedPayload[] {
   const { projectId, pricing } = options ?? {};
 
   const baseInputTokens = Math.max(0, turn.tokensIn - turn.cacheWriteTokens - turn.cacheReadTokens);
@@ -391,7 +607,7 @@ export function mapTranscriptTurn(turn: ClaudeTranscriptTurn, options?: ToDb90Pa
     ? calculateCost(turn.model, baseInputTokens, turn.tokensOut, turn.cacheWriteTokens, turn.cacheReadTokens, pricing)
     : null;
 
-  const payload: Db90Payload = {
+  const payload: ClaudePayload = {
     tool_name: "claude_code",
     event_type: "chat",
     cost_usd: cost,
@@ -411,6 +627,10 @@ export function mapTranscriptTurn(turn: ClaudeTranscriptTurn, options?: ToDb90Pa
       prompt_text: turn.promptText || undefined,
       assistant_text: turn.assistantText || undefined,
       scannable: true,
+      cost_model: "token_count",
+      // Zero is intentional: confirms no tool activity on this turn (not an omission).
+      nav_tool_calls: turn.navToolCalls,
+      total_tool_calls: turn.totalToolCalls,
     },
   };
 
@@ -422,5 +642,31 @@ export function mapTranscriptTurn(turn: ClaudeTranscriptTurn, options?: ToDb90Pa
   }
   if (projectId) payload.project_id = projectId;
 
-  return payload;
+  const derivatives: ClaudeDerivativePayload[] = turn.toolUses.map((toolUse) => {
+    const derivative: ClaudeDerivativePayload = {
+      tool_name: "claude_code",
+      event_type: toolUse.eventType,
+      cost_usd: 0,
+      occurred_at: turn.occurredAt,
+      metadata: {
+        session_id: `${turn.turnId}:tool:${toolUse.id}`,
+        claude_session_id: turn.sessionId,
+        transcript_source: "claude_jsonl",
+        cost_model: "derivative",
+        parent_session_id: turn.turnId,
+        tool_name_inner: toolUse.name,
+        tool_use_id: toolUse.id,
+        summary: toolUse.summary,
+        scannable: false,
+        risk_level: "none",
+        risk_categories: [],
+        risk_score: 0,
+      },
+    };
+    if (turn.model) derivative.model = turn.model;
+    if (projectId) derivative.project_id = projectId;
+    return derivative;
+  });
+
+  return [payload, ...derivatives];
 }

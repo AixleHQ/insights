@@ -46,11 +46,14 @@ module Api
             high_risk_count = base_scope.where(risky_event_condition).distinct.count
             active_users = stats_query.distinct_user_count(start: start, finish: finish, timezone: client_timezone)
 
+            all_events = base_scope.where(occurred_at: start..finish)
             {
               total_events:          totals[:event_count],
               total_cost_usd:        totals[:cost_usd],
               risk_alerts:           high_risk_count,
               active_users:          active_users,
+              total_tokens_in:       all_events.sum(:tokens_in).to_i,
+              total_tokens_out:      all_events.sum(:tokens_out).to_i,
               events_change_percent: nil,
               cost_change_percent:   nil
             }
@@ -85,6 +88,8 @@ module Api
               total_cost_usd:        current_cost,
               risk_alerts:           high_risk_count,
               active_users:          active_users,
+              total_tokens_in:       current_events.sum(:tokens_in).to_i,
+              total_tokens_out:      current_events.sum(:tokens_out).to_i,
               events_change_percent: events_change.round(1),
               cost_change_percent:   cost_change.round(1)
             }
@@ -699,7 +704,7 @@ module Api
       end
 
       def top_users(events, limit)
-        events
+        rows = events
           .where.not(user_id: nil)
           .group(:user_id)
           .select(
@@ -708,19 +713,22 @@ module Api
             "SUM(tokens_in + tokens_out) as total_tokens",
             "SUM(cost_usd) as cost_usd"
           )
-          .order(Arel.sql("total_tokens DESC"))
+          .order(Arel.sql("event_count DESC, cost_usd DESC, user_id"))
           .limit(limit)
-          .map do |row|
-            user = User.find_by(id: row.user_id)
-            {
-              userId:      row.user_id,
-              name:        user&.name || "Unknown",
-              email:       user&.email,
-              eventCount:  row.event_count,
-              totalTokens: row.total_tokens || 0,
-              costUsd:     (row.cost_usd || 0).to_f
-            }
-          end
+
+        users_by_id = User.where(id: rows.map(&:user_id)).index_by(&:id)
+
+        rows.map do |row|
+          user = users_by_id[row.user_id]
+          {
+            userId:      row.user_id,
+            name:        user&.name || "Unknown",
+            email:       user&.email,
+            eventCount:  row.event_count,
+            totalTokens: row.total_tokens || 0,
+            costUsd:     (row.cost_usd || 0).to_f
+          }
+        end
       end
 
       def split_model_key(name)

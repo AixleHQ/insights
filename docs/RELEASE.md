@@ -1,6 +1,6 @@
 # Release & Hotfix Runbook
 
-This is the human runbook for shipping a production release of the Aixle Insights app (Rails API + web on ECS) with GitFlow. Follow it top to bottom and you'll be fine.
+This is the human runbook for shipping a production release of the Aixle Insights / Aixle Insights app (Rails API + web on ECS) with GitFlow. Follow it top to bottom and you'll be fine. If you'd rather have the agent drive the whole thing, there's a `release` skill at `.cursor/skills/release/SKILL.md` that does the same steps — just keep the two in sync when you change one.
 
 ## TL;DR — golden rules
 
@@ -38,7 +38,7 @@ flowchart TD
 A few things worth knowing:
 
 - **`Run DB Migrations` waits on every test job** — including `@aixle/insights (build + test)` and the Windows install smoke. A flake in something totally unrelated will still block your prod deploy.
-- **Runners are self-hosted** and autoscaled, and they've dropped out mid-build before (see Troubleshooting).
+- **CI runners can drop out mid-build** on occasion (see Troubleshooting).
 - **Images are tagged `production-<sha>`,** so rolling back is nothing more than redeploying an older sha.
 
 ## Prerequisites
@@ -48,7 +48,7 @@ Before you start, make sure:
 - `gh auth status` works (you need it to watch/rerun the pipeline and push tags).
 - You have the admin bypass on `develop` and `main` branch protection, or you're ready to open PRs. `develop` used to have `enforce_admins: true`, which blocks even admins — flip it off in GitHub settings if a push gets rejected.
 - You're in the **main repo checkout**, not a worktree — release touches `main`/`develop`/tags.
-- The self-hosted runners are alive: `gh api repos/dualboot-partners/db90-rails/actions/runners --paginate -q '.runners[]|.status' | sort | uniq -c` should show at least a few `online`.
+- The CI runners are healthy: `gh api repos/AixleHQ/insights/actions/runners --paginate -q '.runners[]|.status' | sort | uniq -c` should show at least a few `online`.
 
 ## Versioning rules
 
@@ -106,7 +106,7 @@ git rev-list --count main..release/1.0.0          # commit count going to prod
 git push origin release/1.0.0                     # full CI, no deploy — free pre-flight
 ```
 
-If a merge conflicts, prefer the `develop` side for shared infra files (e.g. the `Makefile` has historically been more evolved on `develop`); double-check any non-obvious resolution.
+If a merge conflicts, prefer the `develop` side for shared infra files (`Makefile`, `scripts/ensure-base-images.sh` have historically been more evolved on `develop`); double-check any non-obvious resolution.
 
 ### Step 3 — Pre-flight: migrations + ENV
 
@@ -134,7 +134,7 @@ Required vars live in `packages/api/lib/tasks/production_readiness.rake`. There 
 ### Step 4 — Bump `VERSION` + `CHANGELOG`
 
 - Write the new number (no `v`) to `VERSION`.
-- Prepend a dated section to `CHANGELOG.md`: `## [<version>] - <YYYY-MM-DD>` with `### Added / Changed / Fixed`, one bullet per `AIX-XX`. Derive bullets from `git log main..release/1.0.0`. Add the link reference `[<version>]: https://github.com/dualboot-partners/db90-rails/releases/tag/v<version>`.
+- Prepend a dated section to `CHANGELOG.md`: `## [<version>] - <YYYY-MM-DD>` with `### Added / Changed / Fixed`, one bullet per `AIX-XX`. Derive bullets from `git log main..release/1.0.0`. Add the link reference `[<version>]: https://github.com/AixleHQ/insights/releases/tag/v<version>`.
 - Review the diff, then commit + push:
 
 ```bash
@@ -259,7 +259,7 @@ There's **no automated rollback.** ECS runs versioned images tagged `production-
 - **Push rejected — "Changes must be made through a pull request":** the branch-protection admin bypass isn't active for that branch. Don't force anything — and don't try to work around it. Direct pushes to `develop`/`main` are for the tech lead during a release only; if that's not you, or you're not mid-release, open a PR instead.
 - **`git: 'switch' is not a git command`:** old git — use `git checkout -b` instead of `git switch -c`.
 - **Merge landed on the wrong branch (a `main` merge ended up on `develop`):** `git checkout` silently no-op'd — this is why the branch guards in Steps 5/9 exist. Symptom: after Step 5, `git rev-parse --abbrev-ref HEAD` is not `main`, or `develop` unexpectedly points at the release-merge commit. If the resulting graph is still a clean fast-forward and trees match (see Step 9), it is salvageable — verify and push. Otherwise `git reset --hard` the affected branch to its `origin/*` and redo from the correct branch.
-- **`Build & Push` fails with "The runner has received a shutdown signal":** self-hosted runner instability, **not** a code defect. Check online runners (`gh api repos/dualboot-partners/db90-rails/actions/runners --paginate -q '.runners[]|.status' | sort | uniq -c`), then rerun the failed jobs: `gh run rerun <run-id> --failed`. This exact failure sank `v1.0.0-alpha.1` and required a rerun for `v1.0.0-alpha.4`; migrate/deploy stay `skipped` on such a failure, so prod is untouched.
+- **`Build & Push` fails with "The runner has received a shutdown signal":** CI runner instability, **not** a code defect. Check online runners (`gh api repos/AixleHQ/insights/actions/runners --paginate -q '.runners[]|.status' | sort | uniq -c`), then rerun the failed jobs: `gh run rerun <run-id> --failed`. This exact failure sank `v1.0.0-alpha.1` and required a rerun for `v1.0.0-alpha.4`; migrate/deploy stay `skipped` on such a failure, so prod is untouched.
 - **Deploy blocked by an unrelated job:** `Run DB Migrations` `needs:` all test jobs, including `@aixle/insights (build + test)` and the Windows install smoke (`windows-latest`). A flaky native-build/Windows failure blocks the prod deploy even though it is unrelated to the Rails release. Rerun the failed job; do not panic-edit Rails code.
 - **`release/1.0.0` far behind `develop` (a prior release skipped GitFlow):** don't cherry-pick — bring it current with `git merge --no-ff origin/develop` (Step 2) to restore the process.
 

@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { EventFilters, type EventFiltersState } from "./EventFilters";
-import type { EventsToolFilterOption } from "@/lib/eventsToolFilters";
+import { CANONICAL_TOOL_NAMES, type EventsToolFilterOption } from "@/lib/eventsToolFilters";
+import { humanizeToolName } from "@/lib/utils";
+import { EVENT_TYPES, EVENT_TYPE_META } from "@/lib/event-types";
 
 describe("EventFilters", () => {
   const defaultTools: EventsToolFilterOption[] = [
@@ -231,6 +233,65 @@ describe("EventFilters", () => {
         expect(screen.getByText(label)).toBeInTheDocument();
         unmount();
       });
+    });
+  });
+
+  // AIX-627: every canonical tool and every event type must be reachable
+  // through the filter UI, so no data source is silently unfilterable.
+  describe("Enum coverage guards", () => {
+    const openSubmenu = async (user: ReturnType<typeof userEvent.setup>, name: RegExp) => {
+      await user.click(screen.getByRole("button", { name: /filters/i }));
+      await user.click(await screen.findByRole("menuitem", { name }));
+    };
+
+    it("renders a selectable option for every canonical tool", async () => {
+      const user = userEvent.setup();
+      const canonicalTools: EventsToolFilterOption[] = CANONICAL_TOOL_NAMES.map((value) => ({
+        value,
+        label: humanizeToolName(value),
+      }));
+      renderFilters({}, canonicalTools);
+
+      await openSubmenu(user, /^tool$/i);
+
+      for (const tool of canonicalTools) {
+        const items = await screen.findAllByRole("menuitemcheckbox", { name: tool.label });
+        expect(items.length).toBeGreaterThan(0);
+      }
+    });
+
+    it("renders a selectable option for every event type", async () => {
+      const user = userEvent.setup();
+      renderFilters();
+
+      await openSubmenu(user, /^event type$/i);
+
+      for (const type of EVENT_TYPES) {
+        const label = EVENT_TYPE_META[type].label;
+        const items = await screen.findAllByRole("menuitemcheckbox", { name: label });
+        expect(items.length).toBeGreaterThan(0);
+      }
+    });
+
+    it("covers exactly the 14 backend event types (tripwire on enum drift)", () => {
+      // Mirror of ToolEvent::EVENT_TYPES (packages/api/app/models/tool_event.rb).
+      const EXPECTED_EVENT_TYPES = [
+        "chat",
+        "completion",
+        "edit",
+        "commit",
+        "review",
+        "test",
+        "debug",
+        "refactor",
+        "documentation",
+        "other",
+        "issue",
+        "comment",
+        "sprint",
+        "tool_use",
+      ];
+      expect([...EVENT_TYPES].sort()).toEqual([...EXPECTED_EVENT_TYPES].sort());
     });
   });
 });

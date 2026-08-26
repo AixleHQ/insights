@@ -12,6 +12,7 @@ CLAUDE.local.md
 .agents/skills/
 .claude/skills/bmad-*
 .claude/launch.json
+.codegraph/
 
 # Build outputs
 dist/
@@ -38,8 +39,6 @@ log/
 /packages/api/public/assets
 /packages/api/public/packs
 /packages/api/.bundle
-/packages/tools/aixle-insights/credentials.json
-/packages/tools/aixle-insights/state-localhost*
 !/packages/api/log/.keep
 !/packages/api/tmp/.keep
 

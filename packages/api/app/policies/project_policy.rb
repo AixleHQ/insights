@@ -1,8 +1,10 @@
 # frozen_string_literal: true
 
 class ProjectPolicy < ApplicationPolicy
+  # Tenant project access follows org/project membership — including for global admins.
+  # Leaving an org must revoke /projects/:id (404 via authorized_scope). Platform
+  # break-glass stays in Administrate, not the member-facing API (AIX-611).
   def show?
-    return true if global_admin?
     return own_personal_project? if record.personal?
     return project_member?(record) || project_owner?(record) if record.organization_project?
     false
@@ -13,9 +15,9 @@ class ProjectPolicy < ApplicationPolicy
     user.present?
   end
 
-  # Org owners can create org projects; users can create personal projects
+  # Org owners can create org projects; users can create personal projects.
+  # No global_admin tenant bypass — same membership rules as show? (AIX-611).
   def create?
-    return true if global_admin?
     return true if record.personal? && record.owner_id == user&.id
     return org_owner?(record.organization) if record.organization_project?
     false
@@ -24,7 +26,6 @@ class ProjectPolicy < ApplicationPolicy
   # Admins can update org projects
   # Owners can update personal projects
   def update?
-    return true if global_admin?
     return own_personal_project? if record.personal?
     return project_admin?(record) if record.organization_project?
     false
@@ -32,7 +33,6 @@ class ProjectPolicy < ApplicationPolicy
 
   # Only owners can destroy projects
   def destroy?
-    return true if global_admin?
     return own_personal_project? if record.personal?
     return project_owner?(record) || org_owner?(record.organization) if record.organization_project?
     false
@@ -58,7 +58,6 @@ class ProjectPolicy < ApplicationPolicy
 
   # Only project admins/owners can view audit logs
   def audit_logs?
-    return true if global_admin?
     return own_personal_project? if record.personal?
     return project_admin?(record) if record.organization_project?
     false
@@ -71,13 +70,16 @@ class ProjectPolicy < ApplicationPolicy
   end
 
   relation_scope do |scope|
-    if global_admin?
-      scope.all
-    elsif user
+    if user
       personal = scope.where(owner_id: user.id)
-      # Projects the user has an explicit membership for
+      # Projects the user has an explicit membership for — but only while they still
+      # belong to that project's org. A stale/orphaned project_membership left behind
+      # after leaving an org must not keep granting access (AIX-611).
+      # Global admins use the same scope: leaving an org must 404 /projects/:id for them too.
       member_project_ids = user.project_memberships.select(:project_id)
+      current_org_ids = user.organization_memberships.select(:organization_id)
       member_org_projects = scope.where(id: member_project_ids)
+                                 .where(organization_id: current_org_ids)
       # Org owners see all projects in their owned orgs
       owned_org_ids = user.organization_memberships.owners.select(:organization_id)
       owned_org_projects = scope.where(organization_id: owned_org_ids)

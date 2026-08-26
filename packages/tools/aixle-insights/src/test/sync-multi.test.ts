@@ -138,7 +138,7 @@ describe("syncTelemetryTools", () => {
     });
     mocks.findTranscriptFiles.mockReturnValue([]);
     mocks.parseTranscriptFile.mockResolvedValue([]);
-    mocks.mapClaudeTranscriptTurn.mockReturnValue(null);
+    mocks.mapClaudeTranscriptTurn.mockReturnValue([]);
     mocks.lookupProjectByRemote.mockResolvedValue("not-found");
     mocks.enrichCommitProjectAttribution.mockResolvedValue(undefined);
     mocks.readCursorEvents.mockReturnValue([]);
@@ -149,7 +149,7 @@ describe("syncTelemetryTools", () => {
     mocks.mapCursorTranscriptTurn.mockReturnValue(null);
     mocks.mapDailyStats.mockReturnValue([]);
     mocks.mapRecentCommit.mockReturnValue(null);
-    mocks.readCursorActiveModel.mockReturnValue(null);
+    mocks.readCursorActiveModel.mockReturnValue({ model: null, source: "unresolved" });
     mocks.postEvent.mockResolvedValue(true);
   });
 
@@ -176,7 +176,7 @@ describe("syncTelemetryTools", () => {
     );
 
     const result = await syncTelemetryTools({
-      credentials: { host, accounts: { cursor: "db90_cursor_token" } },
+      credentials: { host, accounts: { cursor: "aixle_cursor_token" } },
       dryRun: false,
       verbose: false,
       projectId: null,
@@ -200,13 +200,85 @@ describe("syncTelemetryTools", () => {
         }),
       }),
       host,
-      "db90_cursor_token",
+      "aixle_cursor_token",
       expect.any(Object)
     );
     expect(readFileSync(queuePath, "utf-8").trim()).toBe("");
 
-    const state = readState(appDir, host, "db90_cursor_token");
+    const state = readState(appDir, host, "aixle_cursor_token");
     expect(state.sessions["cursor:hook:cmp-sync:gen-sync:sessionEnd"]).toBeDefined();
+  });
+
+  it("threads credentials.insecureHttpAllowed into postEvent as allowInsecureHttp", async () => {
+    const queuePath = join(appDir, "hooks-queue.ndjson");
+    writeFileSync(
+      queuePath,
+      JSON.stringify({
+        captured_at: "2026-05-27T00:01:00.000Z",
+        hook_event_name: "sessionEnd",
+        conversation_id: "cmp-insecure",
+        generation_id: "gen-insecure",
+        model: "claude-sonnet-4-20250514",
+        workspace_roots: ["/tmp/sync-repo"],
+        cursor_version: "1.7.4",
+      }) + "\n",
+      "utf-8"
+    );
+
+    await syncTelemetryTools({
+      credentials: {
+        host: "http://trusted-staging.example",
+        accounts: { cursor: "db90_cursor_token" },
+        insecureHttpAllowed: true,
+      },
+      dryRun: false,
+      verbose: false,
+      projectId: null,
+      pricing: DEFAULT_PRICING,
+      appDir,
+      tools: ["cursor"],
+    });
+
+    expect(mocks.postEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      "http://trusted-staging.example",
+      "db90_cursor_token",
+      expect.objectContaining({ allowInsecureHttp: true })
+    );
+  });
+
+  it("defaults allowInsecureHttp to false when the credential has no consent flag", async () => {
+    const queuePath = join(appDir, "hooks-queue.ndjson");
+    writeFileSync(
+      queuePath,
+      JSON.stringify({
+        captured_at: "2026-05-27T00:01:00.000Z",
+        hook_event_name: "sessionEnd",
+        conversation_id: "cmp-default",
+        generation_id: "gen-default",
+        model: "claude-sonnet-4-20250514",
+        workspace_roots: ["/tmp/sync-repo"],
+        cursor_version: "1.7.4",
+      }) + "\n",
+      "utf-8"
+    );
+
+    await syncTelemetryTools({
+      credentials: { host, accounts: { cursor: "db90_cursor_token" } },
+      dryRun: false,
+      verbose: false,
+      projectId: null,
+      pricing: DEFAULT_PRICING,
+      appDir,
+      tools: ["cursor"],
+    });
+
+    expect(mocks.postEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      host,
+      "db90_cursor_token",
+      expect.objectContaining({ allowInsecureHttp: false })
+    );
   });
 
   it("does not advance the cursor events watermark when all cursor events fail", async () => {
@@ -238,7 +310,7 @@ describe("syncTelemetryTools", () => {
     mocks.postEvent.mockResolvedValue(false);
 
     const result = await syncTelemetryTools({
-      credentials: { host, accounts: { cursor: "db90_cursor_token" } },
+      credentials: { host, accounts: { cursor: "aixle_cursor_token" } },
       dryRun: false,
       verbose: false,
       projectId: null,
@@ -251,7 +323,7 @@ describe("syncTelemetryTools", () => {
     expect(result.sent).toBe(0);
     expect(result.skipped).toBe(0);
 
-    const state = readState(appDir, host, "db90_cursor_token");
+    const state = readState(appDir, host, "aixle_cursor_token");
     expect(state.sessions[CURSOR_EVENTS_WATERMARK_KEY]).toBeUndefined();
   });
 
@@ -286,7 +358,7 @@ describe("syncTelemetryTools", () => {
     );
 
     const result = await syncTelemetryTools({
-      credentials: { host, accounts: { cursor: "db90_cursor_token" } },
+      credentials: { host, accounts: { cursor: "aixle_cursor_token" } },
       dryRun: false,
       verbose: false,
       projectId: null,
@@ -297,12 +369,12 @@ describe("syncTelemetryTools", () => {
 
     expect(result.sent).toBe(1);
     expect(result.failed).toBe(1);
-    const state = readState(appDir, host, "db90_cursor_token");
+    const state = readState(appDir, host, "aixle_cursor_token");
     expect(state.sessions[CURSOR_EVENTS_WATERMARK_KEY]?.sentAt).toBe("2026-05-19T12:00:00.000Z");
   });
 
   it("tracks cursor daily stats independently from cursor event watermarks", async () => {
-    const cursorToken = "db90_cursor_token";
+    const cursorToken = "aixle_cursor_token";
     mocks.readCursorEvents.mockReturnValue([
       { row: { requestId: "r1" }, workspacePath: "/tmp/state.vscdb" },
     ]);
@@ -370,7 +442,7 @@ describe("syncTelemetryTools", () => {
   });
 
   it("re-reads same-day daily stats after watermark is set (AIX-354)", async () => {
-    const cursorToken = "db90_cursor_token";
+    const cursorToken = "aixle_cursor_token";
     const dailyDate = "2026-06-23";
     const dailyPayload = {
       tool_name: "cursor" as const,
@@ -440,7 +512,7 @@ describe("syncTelemetryTools", () => {
   });
 
   it("checkpoints cursor transcript sessions by file size and suppresses aggregate chat duplicates", async () => {
-    const cursorToken = "db90_cursor_token";
+    const cursorToken = "aixle_cursor_token";
     mocks.readCursorTranscriptSessions.mockResolvedValue([
       {
         sessionId: "cursor-session-1",
@@ -525,7 +597,7 @@ describe("syncTelemetryTools", () => {
   });
 
   it("preserves both Claude and Cursor checkpoints when both tools share one token", async () => {
-    const sharedToken = "db90_shared_token";
+    const sharedToken = "aixle_shared_token";
     mocks.findTranscriptFiles.mockReturnValue(["/tmp/session.jsonl"]);
     mocks.parseTranscriptFile.mockResolvedValue(
       [
@@ -548,7 +620,7 @@ describe("syncTelemetryTools", () => {
         },
       ]
     );
-    mocks.mapClaudeTranscriptTurn.mockReturnValue({
+    mocks.mapClaudeTranscriptTurn.mockReturnValue([{
       tool_name: "claude_code",
       event_type: "chat",
       model: "claude-sonnet-4",
@@ -573,7 +645,23 @@ describe("syncTelemetryTools", () => {
         assistant_text: "The release gate now checks package contents.",
         scannable: true,
       },
-    });
+    }, {
+      tool_name: "claude_code",
+      event_type: "edit",
+      cost_usd: 0,
+      occurred_at: "2026-05-19T11:00:00.000Z",
+      metadata: {
+        session_id: "sess-1:1:tool:edit-1",
+        claude_session_id: "sess-1",
+        transcript_source: "claude_jsonl",
+        cost_model: "derivative",
+        parent_session_id: "sess-1:1",
+        scannable: false,
+        risk_level: "none",
+        risk_categories: [],
+        risk_score: 0,
+      },
+    }]);
     mocks.readCursorEvents.mockReturnValue([{ row: { requestId: "r1" }, workspacePath: "/tmp/ws" }]);
     mocks.readCursorTranscriptSessions.mockResolvedValue([]);
     mocks.mapCursorEvent.mockReturnValue({
@@ -607,14 +695,222 @@ describe("syncTelemetryTools", () => {
     });
 
     expect(result.failed).toBe(0);
-    expect(result.sent).toBe(2);
+    expect(result.sent).toBe(3);
+    expect(mocks.postEvent).toHaveBeenCalledTimes(3);
     const state = readState(appDir, host, sharedToken);
     expect(state.sessions[sessionStateKey("sess-1:1")]).toBeDefined();
     expect(state.sessions[CURSOR_EVENTS_WATERMARK_KEY]?.sentAt).toBe("2026-05-19T12:00:00.000Z");
   });
 
+  it("re-emits appended derivatives when a turn grows after a mid-turn sync", async () => {
+    const token = "aixle_claude_midturn_token";
+    mocks.findTranscriptFiles.mockReturnValue(["/tmp/session.jsonl"]);
+
+    const baseTurn = {
+      sessionId: "sess-mt",
+      turnId: "sess-mt:1",
+      filePath: "/tmp/session.jsonl",
+      fileSize: 100,
+      model: "claude-sonnet-4",
+      tokensIn: 10,
+      tokensOut: 5,
+      cacheWriteTokens: 0,
+      cacheReadTokens: 0,
+      occurredAt: "2026-05-19T11:00:00.000Z",
+      promptText: "Do two things",
+      assistantText: "Working on it.",
+      riskLevel: "low",
+      riskScore: 0,
+      riskCategories: [],
+      toolUses: [],
+      navToolCalls: 0,
+      totalToolCalls: 1,
+    };
+    const chatPayload = {
+      tool_name: "claude_code",
+      event_type: "chat",
+      cost_usd: 0.1,
+      occurred_at: "2026-05-19T11:00:00.000Z",
+      metadata: { session_id: "sess-mt:1", claude_session_id: "sess-mt", transcript_source: "claude_jsonl", scannable: true, risk_level: "low", risk_categories: [], risk_score: 0 },
+    };
+    const derivative1 = {
+      tool_name: "claude_code",
+      event_type: "edit",
+      cost_usd: 0,
+      occurred_at: "2026-05-19T11:00:00.000Z",
+      metadata: { session_id: "sess-mt:1:tool:edit-1", claude_session_id: "sess-mt", transcript_source: "claude_jsonl", cost_model: "derivative", parent_session_id: "sess-mt:1", scannable: false, risk_level: "none", risk_categories: [], risk_score: 0 },
+    };
+    const derivative2 = {
+      ...derivative1,
+      metadata: { ...derivative1.metadata, session_id: "sess-mt:1:tool:edit-2" },
+    };
+
+    // First sync: turn has one tool use → chat + first derivative.
+    mocks.parseTranscriptFile.mockResolvedValueOnce([{ ...baseTurn, contentHash: "hash-1" }]);
+    mocks.mapClaudeTranscriptTurn.mockReturnValueOnce([chatPayload, derivative1]);
+
+    const first = await syncTelemetryTools({
+      credentials: { host, accounts: { claude_code: token } },
+      dryRun: false,
+      verbose: false,
+      projectId: null,
+      pricing: DEFAULT_PRICING,
+      appDir,
+      tools: ["claude_code"],
+    });
+    expect(first).toMatchObject({ sent: 2, failed: 0 });
+    expect(readState(appDir, host, token).sessions[sessionStateKey("sess-mt:1")]?.contentHash).toBe("hash-1");
+
+    mocks.postEvent.mockClear();
+
+    // Second sync: same turnId, but Claude appended a second tool use → new hash.
+    mocks.parseTranscriptFile.mockResolvedValueOnce([{ ...baseTurn, contentHash: "hash-2" }]);
+    mocks.mapClaudeTranscriptTurn.mockReturnValueOnce([chatPayload, derivative1, derivative2]);
+
+    const second = await syncTelemetryTools({
+      credentials: { host, accounts: { claude_code: token } },
+      dryRun: false,
+      verbose: false,
+      projectId: null,
+      pricing: DEFAULT_PRICING,
+      appDir,
+      tools: ["claude_code"],
+    });
+
+    // The turn must NOT be skipped: its derivatives (incl. the new one) are re-sent.
+    expect(second).toMatchObject({ sent: 3, failed: 0 });
+    const sentIds = mocks.postEvent.mock.calls.map((c) => (c[0] as { metadata: { session_id: string } }).metadata.session_id);
+    expect(sentIds).toContain("sess-mt:1:tool:edit-2");
+    expect(readState(appDir, host, token).sessions[sessionStateKey("sess-mt:1")]?.contentHash).toBe("hash-2");
+  });
+
+  it("does not checkpoint a Claude turn when a derivative payload fails", async () => {
+    const token = "aixle_claude_token";
+    mocks.findTranscriptFiles.mockReturnValue(["/tmp/session.jsonl"]);
+    mocks.parseTranscriptFile.mockResolvedValue([{
+      sessionId: "sess-fail",
+      turnId: "sess-fail:1",
+      filePath: "/tmp/session.jsonl",
+      fileSize: 123,
+      model: "claude-sonnet-4",
+      tokensIn: 10,
+      tokensOut: 5,
+      cacheWriteTokens: 0,
+      cacheReadTokens: 0,
+      occurredAt: "2026-05-19T11:00:00.000Z",
+      promptText: "Make a change",
+      assistantText: "",
+      riskLevel: "low",
+      riskScore: 0,
+      riskCategories: [],
+    }]);
+    mocks.mapClaudeTranscriptTurn.mockReturnValue([
+      {
+        tool_name: "claude_code",
+        event_type: "chat",
+        cost_usd: 0.1,
+        occurred_at: "2026-05-19T11:00:00.000Z",
+        metadata: {
+          session_id: "sess-fail:1",
+          claude_session_id: "sess-fail",
+          transcript_source: "claude_jsonl",
+          scannable: true,
+          risk_level: "low",
+          risk_categories: [],
+          risk_score: 0,
+        },
+      },
+      {
+        tool_name: "claude_code",
+        event_type: "edit",
+        cost_usd: 0,
+        occurred_at: "2026-05-19T11:00:00.000Z",
+        metadata: {
+          session_id: "sess-fail:1:tool:edit-1",
+          claude_session_id: "sess-fail",
+          transcript_source: "claude_jsonl",
+          cost_model: "derivative",
+          parent_session_id: "sess-fail:1",
+          scannable: false,
+          risk_level: "none",
+          risk_categories: [],
+          risk_score: 0,
+        },
+      },
+    ]);
+    mocks.postEvent.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+
+    const result = await syncTelemetryTools({
+      credentials: { host, accounts: { claude_code: token } },
+      dryRun: false,
+      verbose: false,
+      projectId: null,
+      pricing: DEFAULT_PRICING,
+      appDir,
+      tools: ["claude_code"],
+    });
+
+    expect(result).toMatchObject({ sent: 0, failed: 1 });
+    expect(mocks.postEvent).toHaveBeenCalledTimes(2);
+    expect(readState(appDir, host, token).sessions[sessionStateKey("sess-fail:1")]).toBeUndefined();
+  });
+
+  it("dry-run logs and counts every Claude parent/derivative payload without posting", async () => {
+    const token = "aixle_claude_dry_run_token";
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    mocks.findTranscriptFiles.mockReturnValue(["/tmp/session.jsonl"]);
+    mocks.parseTranscriptFile.mockResolvedValue([{
+      sessionId: "sess-dry",
+      turnId: "sess-dry:1",
+      filePath: "/tmp/session.jsonl",
+      fileSize: 123,
+      model: "claude-sonnet-4",
+      tokensIn: 10,
+      tokensOut: 5,
+      cacheWriteTokens: 0,
+      cacheReadTokens: 0,
+      occurredAt: "2026-05-19T11:00:00.000Z",
+      promptText: "Make a change",
+      assistantText: "",
+      riskLevel: "low",
+      riskScore: 0,
+      riskCategories: [],
+    }]);
+    mocks.mapClaudeTranscriptTurn.mockReturnValue([
+      {
+        tool_name: "claude_code",
+        event_type: "chat",
+        cost_usd: 0.1,
+        occurred_at: "2026-05-19T11:00:00.000Z",
+        metadata: { session_id: "sess-dry:1", claude_session_id: "sess-dry", transcript_source: "claude_jsonl", scannable: true, risk_level: "low", risk_categories: [], risk_score: 0 },
+      },
+      {
+        tool_name: "claude_code",
+        event_type: "edit",
+        cost_usd: 0,
+        occurred_at: "2026-05-19T11:00:00.000Z",
+        metadata: { session_id: "sess-dry:1:tool:edit-1", claude_session_id: "sess-dry", transcript_source: "claude_jsonl", cost_model: "derivative", parent_session_id: "sess-dry:1", scannable: false, risk_level: "none", risk_categories: [], risk_score: 0 },
+      },
+    ]);
+
+    const result = await syncTelemetryTools({
+      credentials: { host, accounts: { claude_code: token } },
+      dryRun: true,
+      verbose: false,
+      projectId: null,
+      pricing: DEFAULT_PRICING,
+      appDir,
+      tools: ["claude_code"],
+    });
+
+    expect(result).toMatchObject({ sent: 2, failed: 0 });
+    expect(mocks.postEvent).not.toHaveBeenCalled();
+    expect(logSpy.mock.calls.filter(([line]) => String(line).startsWith("[dry-run] Would send Claude"))).toHaveLength(2);
+    logSpy.mockRestore();
+  });
+
   it("posts recent-commit snapshots and advances the recent-commit watermark", async () => {
-    const cursorToken = "db90_cursor_token";
+    const cursorToken = "aixle_cursor_token";
     mocks.readRecentCommitSnapshots.mockReturnValue([
       {
         dbPath: "/tmp/state.vscdb",
@@ -666,7 +962,7 @@ describe("syncTelemetryTools", () => {
   });
 
   it("reads recent commits with since=null when hash dedupe is enabled", async () => {
-    const cursorToken = "db90_cursor_token";
+    const cursorToken = "aixle_cursor_token";
     writeState(
       {
         version: 1,
@@ -696,7 +992,7 @@ describe("syncTelemetryTools", () => {
   });
 
   it("skips recent commit when lastRecentCommitHashes already contains the hash", async () => {
-    const cursorToken = "db90_cursor_token";
+    const cursorToken = "aixle_cursor_token";
     writeState(
       {
         version: 1,
@@ -758,7 +1054,7 @@ describe("syncTelemetryTools", () => {
   });
 
   it("fullScan ignores watermarks and commit hash dedupe", async () => {
-    const cursorToken = "db90_cursor_token";
+    const cursorToken = "aixle_cursor_token";
     writeState(
       {
         version: 1,
@@ -825,8 +1121,8 @@ describe("syncTelemetryTools", () => {
   });
 
   it("passes active model from settings into daily stats and commit mappers", async () => {
-    const cursorToken = "db90_cursor_token";
-    mocks.readCursorActiveModel.mockReturnValue("claude-4-sonnet");
+    const cursorToken = "aixle_cursor_token";
+    mocks.readCursorActiveModel.mockReturnValue({ model: "claude-4-sonnet", source: "settings_json" });
     mocks.readDailyStats.mockReturnValue({
       raw: [
         {
@@ -906,18 +1202,20 @@ describe("syncTelemetryTools", () => {
       expect.anything(),
       undefined,
       expect.anything(),
-      "claude-4-sonnet"
+      "claude-4-sonnet",
+      "settings_json"
     );
     expect(mocks.mapRecentCommit).toHaveBeenCalledWith(
       expect.anything(),
       undefined,
       expect.anything(),
-      "claude-4-sonnet"
+      "claude-4-sonnet",
+      "settings_json"
     );
   });
 
   it("overrides Claude auto-detected cwd project instead of reusing the sync cwd project", async () => {
-    const sharedToken = "db90_shared_token";
+    const sharedToken = "aixle_shared_token";
     mocks.findTranscriptFiles.mockReturnValue(["/tmp/session.jsonl"]);
     mocks.parseTranscriptFile.mockResolvedValue([
       {
@@ -941,7 +1239,7 @@ describe("syncTelemetryTools", () => {
     ]);
     mockExecFileSync.mockReturnValue("git@github.com:org/right-project.git\n" as unknown as Buffer);
     mocks.lookupProjectByRemote.mockResolvedValue({ project_id: "proj-from-cwd", name: "Right Project" });
-    mocks.mapClaudeTranscriptTurn.mockImplementation((_turn, options) => ({
+    mocks.mapClaudeTranscriptTurn.mockImplementation((_turn, options) => ([{
       tool_name: "claude_code",
       event_type: "chat",
       model: "claude-sonnet-4",
@@ -967,7 +1265,7 @@ describe("syncTelemetryTools", () => {
         assistant_text: "Using the repo-specific cwd.",
         scannable: true,
       },
-    }));
+    }]));
 
     await syncTelemetryTools({
       credentials: { host, accounts: { claude_code: sharedToken } },
@@ -987,7 +1285,7 @@ describe("syncTelemetryTools", () => {
   });
 
   it("overrides Cursor workspace payloads with workspace-specific project attribution", async () => {
-    const cursorToken = "db90_cursor_token";
+    const cursorToken = "aixle_cursor_token";
     mocks.readCursorEvents.mockReturnValue([
       { row: { requestId: "r1" }, workspacePath: "/tmp/storage/workspace-a" },
     ]);
@@ -1035,7 +1333,7 @@ describe("syncTelemetryTools", () => {
   });
 
   it("sets validationFailed on cursor dry-run when payload contract fails", async () => {
-    const cursorToken = "db90_cursor_token";
+    const cursorToken = "aixle_cursor_token";
     mocks.readCursorEvents.mockReturnValue([{ row: { requestId: "r1" }, workspacePath: "/tmp/ws" }]);
     mocks.mapCursorEvent.mockReturnValue({
       tool_name: "cursor",
@@ -1069,7 +1367,7 @@ describe("syncTelemetryTools", () => {
   });
 
   it("scopeDir: only syncs Claude turns whose cwd matches and uses pre-resolved projectId", async () => {
-    const token = "db90_scoped_token";
+    const token = "aixle_scoped_token";
     mocks.findTranscriptFiles.mockReturnValue(["/transcripts/a.jsonl"]);
     mocks.parseTranscriptFile.mockResolvedValueOnce([
       {
@@ -1109,7 +1407,7 @@ describe("syncTelemetryTools", () => {
         riskCategories: [],
       },
     ]);
-    mocks.mapClaudeTranscriptTurn.mockImplementation((_turn, options) => ({
+    mocks.mapClaudeTranscriptTurn.mockImplementation((_turn, options) => ([{
       tool_name: "claude_code",
       event_type: "chat",
       occurred_at: "2026-05-19T10:00:00.000Z",
@@ -1129,7 +1427,7 @@ describe("syncTelemetryTools", () => {
         risk_score: 0,
         scannable: true as const,
       },
-    }));
+    }]));
 
     await syncTelemetryTools({
       credentials: { host, accounts: { claude_code: token } },
@@ -1154,7 +1452,7 @@ describe("syncTelemetryTools", () => {
   });
 
   it("scopeDir + null projectId: falls back to per-turn cwd lookup for Claude turns", async () => {
-    const token = "db90_scoped_token";
+    const token = "aixle_scoped_token";
     mockExecFileSync.mockImplementation((cmd: unknown, args?: readonly unknown[]) => {
       if (
         cmd === "git" &&
@@ -1193,7 +1491,7 @@ describe("syncTelemetryTools", () => {
         riskCategories: [],
       },
     ]);
-    mocks.mapClaudeTranscriptTurn.mockImplementation((_turn, options) => ({
+    mocks.mapClaudeTranscriptTurn.mockImplementation((_turn, options) => ([{
       tool_name: "claude_code",
       event_type: "chat",
       occurred_at: "2026-05-19T10:00:00.000Z",
@@ -1213,7 +1511,7 @@ describe("syncTelemetryTools", () => {
         risk_score: 0,
         scannable: true as const,
       },
-    }));
+    }]));
 
     await syncTelemetryTools({
       credentials: { host, accounts: { claude_code: token } },
@@ -1242,7 +1540,7 @@ describe("syncTelemetryTools", () => {
   });
 
   it("scopeDir + null projectId: falls back to per-payload workspace lookup for Cursor transcripts", async () => {
-    const cursorToken = "db90_cursor_scoped_token";
+    const cursorToken = "aixle_cursor_scoped_token";
     mockExecFileSync.mockImplementation((cmd: unknown, args?: readonly unknown[]) => {
       if (
         cmd === "git" &&
@@ -1324,7 +1622,7 @@ describe("syncTelemetryTools", () => {
   });
 
   it("skips Claude noise turns returned by parseTranscriptFile and does not POST them", async () => {
-    const token = "db90_noise_token";
+    const token = "aixle_noise_token";
     mocks.findTranscriptFiles.mockReturnValue(["/transcripts/noise.jsonl"]);
     const noiseTurn = {
       sessionId: "sess-noise",
@@ -1367,7 +1665,7 @@ describe("syncTelemetryTools", () => {
     mocks.isClaudeNoiseTranscriptTurn.mockImplementation(
       (turn: { sessionId: string }) => turn.sessionId === "sess-noise"
     );
-    mocks.mapClaudeTranscriptTurn.mockImplementation((turn) => ({
+    mocks.mapClaudeTranscriptTurn.mockImplementation((turn) => ([{
       tool_name: "claude_code",
       event_type: "chat",
       occurred_at: turn.occurredAt,
@@ -1386,7 +1684,7 @@ describe("syncTelemetryTools", () => {
         risk_score: 0,
         scannable: true as const,
       },
-    }));
+    }]));
     mocks.postEvent.mockResolvedValue(true);
 
     const result = await syncTelemetryTools({
@@ -1456,7 +1754,7 @@ describe("filterRecentCommitsByHashDedup", () => {
 describe("lastRecentCommitHashes partial batch failure guard", () => {
   let appDir: string;
   const host = "http://localhost:3000";
-  const cursorToken = "db90_cursor_token";
+  const cursorToken = "aixle_cursor_token";
 
   function makeCommitPayload(hash: string, occurredAt: string) {
     return {
@@ -1487,7 +1785,7 @@ describe("lastRecentCommitHashes partial batch failure guard", () => {
     mockExecFileSync.mockImplementation(() => { throw new Error("not a git repo"); });
     mocks.findTranscriptFiles.mockReturnValue([]);
     mocks.parseTranscriptFile.mockResolvedValue([]);
-    mocks.mapClaudeTranscriptTurn.mockReturnValue(null);
+    mocks.mapClaudeTranscriptTurn.mockReturnValue([]);
     mocks.lookupProjectByRemote.mockResolvedValue("not-found");
     mocks.enrichCommitProjectAttribution.mockResolvedValue(undefined);
     mocks.readCursorEvents.mockReturnValue([]);
@@ -1498,6 +1796,7 @@ describe("lastRecentCommitHashes partial batch failure guard", () => {
     mocks.mapCursorTranscriptTurn.mockReturnValue(null);
     mocks.mapDailyStats.mockReturnValue([]);
     mocks.mapRecentCommit.mockReturnValue(null);
+    mocks.readCursorActiveModel.mockReturnValue({ model: null, source: "unresolved" });
     mocks.postEvent.mockResolvedValue(true);
   });
 

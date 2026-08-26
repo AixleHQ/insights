@@ -8,6 +8,23 @@ export function formatDateLabel(dateStr: string, granularity: "month" | "day"): 
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+/** Mon-start week bucket → "Jul 6 - 12" or "Jun 29 - Jul 5" when the week crosses months. */
+export function formatWeekRange(dateStr: string): string {
+  const start = new Date(dateStr + "T00:00:00");
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+
+  const startMonth = start.toLocaleDateString("en-US", { month: "short" });
+  const endMonth = end.toLocaleDateString("en-US", { month: "short" });
+  const startDay = start.getDate();
+  const endDay = end.getDate();
+
+  if (start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()) {
+    return `${startMonth} ${startDay} - ${endDay}`;
+  }
+  return `${startMonth} ${startDay} - ${endMonth} ${endDay}`;
+}
+
 export function formatLocalDate(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
@@ -31,6 +48,17 @@ export function currentMonth(): string {
 
 export function isCurrentMonth(value: string): boolean {
   return value === currentMonth();
+}
+
+export function projectScopeLabel(
+  projectId: string | undefined,
+  projects: { id: string; name: string }[] | undefined,
+  noun: string
+): string {
+  if (!projectId) return `${noun} across your organization`;
+  if (projectId === "none") return `${noun} not assigned to a project`;
+  const name = projects?.find((p) => p.id === projectId)?.name;
+  return name ? `${noun} for ${name}` : `${noun} for the selected project`;
 }
 
 export function getLast12Months(): { value: string; label: string }[] {

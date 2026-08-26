@@ -3,6 +3,8 @@
  */
 
 import { createHash, randomBytes } from "node:crypto";
+import { isLoopbackHost } from "../lib/transport-security.js";
+import { readEnvWithDeprecatedAlias, readBooleanEnvWithDeprecatedAlias, warnDeprecatedEnvVar } from "../lib/env.js";
 
 export interface DeviceAuthorizationStart {
   device_code: string;
@@ -201,20 +203,50 @@ export async function obtainKeycloakAccessTokenViaDeviceFlow(params: {
   });
 }
 
-export function defaultKeycloakIssuer(): string {
+export function defaultKeycloakIssuer(ingestHost?: string): string {
   const fromEnv =
-    process.env["DB90_KEYCLOAK_ISSUER"]?.trim() ||
-    process.env["KEYCLOAK_ISSUER"]?.trim();
+    readEnvWithDeprecatedAlias({
+      current: "AIXLE_INSIGHTS_KEYCLOAK_ISSUER",
+      deprecated: "DB90_KEYCLOAK_ISSUER",
+      onDeprecatedUse: warnDeprecatedEnvVar,
+    }) || process.env["KEYCLOAK_ISSUER"]?.trim();
   if (fromEnv) return fromEnv.replace(/\/$/, "");
-  const useLocalDefault = ["1", "true", "yes"].includes(
-    process.env["DB90_MCP_USE_LOCAL_KEYCLOAK_DEFAULT"]?.toLowerCase() ?? ""
-  );
+  const useLocalDefault = readBooleanEnvWithDeprecatedAlias({
+    current: "AIXLE_INSIGHTS_MCP_USE_LOCAL_KEYCLOAK_DEFAULT",
+    deprecated: "DB90_MCP_USE_LOCAL_KEYCLOAK_DEFAULT",
+    onDeprecatedUse: warnDeprecatedEnvVar,
+  });
   if (useLocalDefault || process.env["NODE_ENV"] === "development") {
+    if (ingestHost) {
+      let hostname: string;
+      try {
+        hostname = new URL(ingestHost).hostname;
+      } catch {
+        hostname = ingestHost;
+      }
+      if (!isLoopbackHost(hostname)) {
+        const reason = useLocalDefault
+          ? `DB90_MCP_USE_LOCAL_KEYCLOAK_DEFAULT=${process.env["DB90_MCP_USE_LOCAL_KEYCLOAK_DEFAULT"]}`
+          : `NODE_ENV=development`;
+        console.error(
+          `[aixle-insights] Warning: ${reason} would redirect Keycloak authentication to ` +
+          `http://localhost:8080, but the ingest host "${ingestHost}" is not localhost. ` +
+          `Ignoring the local Keycloak default. Set DB90_KEYCLOAK_ISSUER explicitly.`
+        );
+        return "";
+      }
+    }
     return "http://localhost:8080/realms/db90";
   }
   return "";
 }
 
 export function defaultKeycloakClientId(): string {
-  return process.env["DB90_KEYCLOAK_CLIENT_ID"]?.trim() || "db90-web";
+  return (
+    readEnvWithDeprecatedAlias({
+      current: "AIXLE_INSIGHTS_KEYCLOAK_CLIENT_ID",
+      deprecated: "DB90_KEYCLOAK_CLIENT_ID",
+      onDeprecatedUse: warnDeprecatedEnvVar,
+    }) || "db90-web"
+  );
 }

@@ -325,7 +325,7 @@ if heavy_seed_enabled?
     organization: org,
     connector_type: 'github'
   ) do |c|
-    c.access_token = 'ghp_simulated_token_for_development_only'
+    c.access_token = 'DEVELOPMENT_PLACEHOLDER_NOT_A_REAL_TOKEN'
     c.is_active = true
     c.config = { organization: 'dualboot-partners' }
   end

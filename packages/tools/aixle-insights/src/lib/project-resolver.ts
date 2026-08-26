@@ -1,4 +1,7 @@
 import { execFileSync } from "node:child_process";
+import { isSafeSshHost } from "./spawn-arg-safety.js";
+import { safeGitRepoPath } from "./repo-path-safety.js";
+import { evaluateTransportSecurity } from "./transport-security.js";
 
 export interface ProjectResolution {
   projectId: string | null;
@@ -20,7 +23,8 @@ export async function resolveProjectId(
   configValue: string | undefined,
   host: string,
   token: string,
-  verbose: boolean
+  verbose: boolean,
+  allowInsecureHttp = false
 ): Promise<ProjectResolution> {
   const flag = coerce(flagValue);
   const config = coerce(configValue);
@@ -31,7 +35,7 @@ export async function resolveProjectId(
   const gitRemote = getGitRemote(verbose);
   if (gitRemote === null) return { projectId: null, source: "none" };
 
-  const result = await lookupProjectByRemote(gitRemote, host, token, verbose);
+  const result = await lookupProjectByRemote(gitRemote, host, token, verbose, allowInsecureHttp);
   if (result === "not-found") return { projectId: null, source: "auto-detect-not-found" };
   if (result !== null) return { projectId: result.project_id, source: "auto-detect" };
   return { projectId: null, source: "none" };
@@ -41,12 +45,13 @@ export async function resolveProjectIdForRepoPath(
   repoPath: string,
   host: string,
   token: string,
-  verbose: boolean
+  verbose: boolean,
+  allowInsecureHttp = false
 ): Promise<ProjectResolution> {
   const gitRemote = getGitRemoteForPath(repoPath, verbose);
   if (gitRemote === null) return { projectId: null, source: "none" };
 
-  const result = await lookupProjectByRemote(gitRemote, host, token, verbose);
+  const result = await lookupProjectByRemote(gitRemote, host, token, verbose, allowInsecureHttp);
   if (result === "not-found") return { projectId: null, source: "auto-detect-not-found" };
   if (result !== null) return { projectId: result.project_id, source: "auto-detect" };
   return { projectId: null, source: "none" };
@@ -67,8 +72,18 @@ export function getGitRemote(verbose: boolean): string | null {
 }
 
 export function getGitRemoteForPath(repoPath: string, verbose: boolean): string | null {
+  // The spawn boundary. `repoPath` is untrusted (Cursor workspace.json, a
+  // composer uri.fsPath, a hook workspace_root, or a Claude transcript cwd), so
+  // it must resolve to a real directory before git reads its .git/config.
+  // Supersedes the isSafeSpawnPathArg check from AIX-546, which this
+  // subsumes. See AIX-547.
+  const safePath = safeGitRepoPath(repoPath);
+  if (safePath === null) {
+    if (verbose) console.log(`[verbose] Refusing git for unsafe repo path: ${repoPath}`);
+    return null;
+  }
   try {
-    const out = execFileSync("git", ["-C", repoPath, "remote", "get-url", "origin"], {
+    const out = execFileSync("git", ["-C", safePath, "remote", "get-url", "origin"], {
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "pipe"],
       timeout: 5000,
@@ -93,12 +108,20 @@ export function canonicalizeGitRemote(remote: string, verbose: boolean): string 
   if (!trimmed) return remote;
 
   const scp = trimmed.match(/^([\w.-]+)@([^:/]+):(.+)$/);
+  /* eslint-disable-next-line security/detect-unsafe-regex -- Flagged only
+     because safe-regex counts `?` as a repetition. Every group is separated by
+     a literal delimiter (`@`, `:`, `/`) that its neighbours exclude, so there
+     is no backtracking ambiguity. Input is a git remote URL, bounded length. */
   const sshUrl = trimmed.match(/^ssh:\/\/(?:([\w.-]+)@)?([^:/]+)(?::\d+)?\/(.+)$/i);
   const host = scp?.[2] ?? sshUrl?.[2];
-  if (!host) return trimmed;
+  // An unvalidated host would be parsed by ssh as an option (AIX-546); an
+  // unvalidated `resolved` would be spliced back into the remote and sent to
+  // the lookup endpoint. Both fail open — the remote is returned unchanged.
+  if (!host || !isSafeSshHost(host)) return trimmed;
 
   const resolved = resolveSshHostName(host, verbose);
-  if (!resolved || resolved.toLowerCase() === host.toLowerCase()) return trimmed;
+  if (!resolved || !isSafeSshHost(resolved)) return trimmed;
+  if (resolved.toLowerCase() === host.toLowerCase()) return trimmed;
 
   if (verbose) console.log(`[verbose] Resolved SSH host alias ${host} -> ${resolved}`);
   if (scp) return `${scp[1]}@${resolved}:${scp[3]}`;
@@ -107,6 +130,12 @@ export function canonicalizeGitRemote(remote: string, verbose: boolean): string 
 }
 
 function resolveSshHostName(host: string, verbose: boolean): string | null {
+  // Defense in depth: the only caller already checks, but this function is the
+  // spawn boundary and must not depend on callers getting it right.
+  if (!isSafeSshHost(host)) {
+    if (verbose) console.log(`[verbose] Refusing ssh -G for option-shaped host: ${host}`);
+    return null;
+  }
   try {
     const out = execFileSync("ssh", ["-G", host], {
       encoding: "utf-8",
@@ -142,6 +171,11 @@ export function repoNameToGitRemoteCandidates(repoName: string): string[] {
   if (trimmed.includes("://") || trimmed.includes("@")) {
     return [trimmed];
   }
+  /* eslint-disable-next-line security/detect-unsafe-regex -- Star height 2
+     (`+` inside `(…)*`), but the inner group is prefixed by `/`, which is not
+     in [\w.-]. There is no ambiguous overlap, so matching stays linear. The
+     input is a short `owner/repo` slug that already failed the "://" and "@"
+     checks above. */
   if (/^[\w.-]+\/[\w.-]+(\/[\w.-]+)*$/.test(trimmed)) {
     return [`https://github.com/${trimmed}`, `git@github.com:${trimmed}.git`];
   }
@@ -152,7 +186,8 @@ export async function lookupProjectByRepoName(
   repoName: string,
   host: string,
   token: string,
-  verbose: boolean
+  verbose: boolean,
+  allowInsecureHttp = false
 ): Promise<LookupResult | "not-found" | null> {
   const candidates = repoNameToGitRemoteCandidates(repoName);
   if (candidates.length === 0) {
@@ -160,14 +195,14 @@ export async function lookupProjectByRepoName(
     return "not-found";
   }
   for (const candidate of candidates) {
-    const result = await lookupProjectByRemote(candidate, host, token, verbose);
+    const result = await lookupProjectByRemote(candidate, host, token, verbose, allowInsecureHttp);
     if (result === "not-found") continue;
     return result;
   }
   return "not-found";
 }
 
-/** Payload shape shared by db90-cursor and telemetry-mcp commit mappers. */
+/** Payload shape shared by the Cursor and Claude commit mappers. */
 export interface CommitAttributionPayload {
   event_type?: string;
   project_id?: string;
@@ -186,6 +221,7 @@ export async function enrichCommitProjectAttribution(
     host: string;
     token: string;
     verbose?: boolean;
+    allowInsecureHttp?: boolean;
   }
 ): Promise<void> {
   const explicit =
@@ -203,7 +239,8 @@ export async function enrichCommitProjectAttribution(
       repoName,
       options.host,
       options.token,
-      options.verbose ?? false
+      options.verbose ?? false,
+      options.allowInsecureHttp === true
     );
     if (result && typeof result === "object" && "project_id" in result) {
       payload.project_id = result.project_id;
@@ -220,8 +257,21 @@ export async function lookupProjectByRemote(
   gitRemote: string,
   host: string,
   token: string,
-  verbose: boolean
+  verbose: boolean,
+  allowInsecureHttp = false
 ): Promise<LookupResult | "not-found" | null> {
+  const transportSecurity = evaluateTransportSecurity(host, {
+    allowInsecureHttp,
+    label: "Aixle Insights project-lookup host",
+  });
+  if (!transportSecurity.ok) {
+    console.error(`Blocked project lookup — ${transportSecurity.error}`);
+    return null;
+  }
+  if (transportSecurity.warning) {
+    console.error(`Warning: ${transportSecurity.warning}`);
+  }
+
   const url = `${host.replace(/\/$/, "")}/api/v1/projects/lookup?git_remote=${encodeURIComponent(gitRemote)}`;
   try {
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });

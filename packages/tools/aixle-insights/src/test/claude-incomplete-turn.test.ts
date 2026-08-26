@@ -43,6 +43,10 @@ function makeTurn(overrides: Partial<ClaudeTranscriptTurn> = {}): ClaudeTranscri
     riskLevel: "low",
     riskScore: 0,
     riskCategories: [],
+    toolUses: [],
+    navToolCalls: 0,
+    totalToolCalls: 0,
+    contentHash: "",
     ...overrides,
   };
 }

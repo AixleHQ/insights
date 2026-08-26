@@ -93,7 +93,10 @@ export function probeCursorGlobalStateDb(verbose = false, baseDir?: string): boo
 export function findCursorDbs(baseDir?: string): string[] {
   const dir = join(baseDir ?? cursorUserDir(), "workspaceStorage");
   try {
-    return glob.sync(join(dir, "**", "cursor.db"));
+    // Pattern stays forward-slash and the directory goes through `cwd`. Building
+    // it with `join` emitted `\` on Windows, and glob treats `\` as an escape
+    // character on every platform, so this silently matched nothing there.
+    return glob.sync("**/cursor.db", { cwd: dir, absolute: true });
   } catch {
     return [];
   }
@@ -315,7 +318,16 @@ export function findStateVscDbs(baseDir?: string): string[] {
   results.push(join(userDir, "globalStorage", "state.vscdb"));
 
   try {
-    results.push(...glob.sync(join(userDir, "workspaceStorage", "**", "state.vscdb")));
+    // Forward-slash pattern + `cwd`, as above. This one mattered most: the
+    // globalStorage path is pushed unconditionally, so on Windows the function
+    // still returned a result while silently dropping every per-workspace
+    // state.vscdb — partial data loss that looked like working software.
+    results.push(
+      ...glob.sync("workspaceStorage/**/state.vscdb", {
+        cwd: userDir,
+        absolute: true,
+      }),
+    );
   } catch {
     /* ignore */
   }
@@ -543,13 +555,21 @@ interface CursorComposerHeader {
   composerId: string;
   name: string | null;
   workspacePath: string | null;
+  /** Session start (composer.createdAt). Used to spread turns when JSONL lacks per-message times. */
+  createdAt: string | null;
   lastUpdatedAt: string | null;
 }
 
 interface CursorTranscriptLine {
   role?: string;
+  /** Per-message time when Cursor emits it (ISO string, epoch ms, or epoch seconds). */
+  timestamp?: number | string | null;
+  createdAt?: number | string | null;
+  unixMs?: number | string | null;
   message?: {
     content?: unknown;
+    timestamp?: number | string | null;
+    createdAt?: number | string | null;
   };
 }
 
@@ -601,6 +621,65 @@ function toIsoFromMs(value: unknown): string | null {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+/** Coerce epoch ms/seconds, numeric strings, or ISO-8601 into an ISO timestamp. */
+function coerceTranscriptTimestamp(value: unknown): string | null {
+  if (value == null) return null;
+  // Route numbers through toEpochMs (via toIsoString) so epoch *seconds* are scaled
+  // to ms — otherwise e.g. 1720000000 (2024 in seconds) is misread as a 1970 ms value.
+  if (typeof value === "number") return toIsoString(value);
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const fromEpoch = toIsoString(trimmed);
+  if (fromEpoch) return fromEpoch;
+  const ms = Date.parse(trimmed);
+  if (Number.isNaN(ms)) return null;
+  return new Date(ms).toISOString();
+}
+
+/** Prefer explicit per-line / per-message times when Cursor includes them. */
+function extractLineOccurredAt(entry: CursorTranscriptLine): string | null {
+  const candidates: unknown[] = [
+    entry.timestamp,
+    entry.createdAt,
+    entry.unixMs,
+    entry.message?.timestamp,
+    entry.message?.createdAt,
+  ];
+  for (const candidate of candidates) {
+    const iso = coerceTranscriptTimestamp(candidate);
+    if (iso) return iso;
+  }
+  return null;
+}
+
+/**
+ * Spread turns across [start, end] when the JSONL has no per-message times.
+ * Prevents first-sync backfill from collapsing every turn onto lastUpdatedAt/mtime
+ * (AIX-605 weekly chart spike).
+ */
+function interpolateTurnOccurredAt(
+  startIso: string | null,
+  endIso: string | null,
+  index: number,
+  total: number,
+  fallbackIso: string
+): string {
+  if (total <= 0) return fallbackIso;
+  // Single turn: prefer session end (lastUpdatedAt) — matches prior composer-header behavior.
+  if (total === 1) return endIso ?? startIso ?? fallbackIso;
+
+  const startMs = startIso ? Date.parse(startIso) : NaN;
+  const endMs = endIso ? Date.parse(endIso) : NaN;
+  if (Number.isNaN(startMs) || Number.isNaN(endMs)) {
+    return startIso ?? endIso ?? fallbackIso;
+  }
+  if (endMs <= startMs) return startIso ?? fallbackIso;
+
+  const ms = startMs + ((endMs - startMs) * index) / (total - 1);
+  return new Date(ms).toISOString();
+}
+
 function readComposerHeaders(baseDir?: string): Map<string, CursorComposerHeader> {
   const userDir = baseDir ?? cursorUserDir();
   const dbPath = join(userDir, "globalStorage", "state.vscdb");
@@ -647,6 +726,7 @@ function readComposerHeaders(baseDir?: string): Map<string, CursorComposerHeader
         composerId,
         name: typeof composer.name === "string" ? composer.name : null,
         workspacePath: typeof uri?.fsPath === "string" ? uri.fsPath : null,
+        createdAt: toIsoFromMs(composer.createdAt),
         lastUpdatedAt: toIsoFromMs(composer.lastUpdatedAt),
       });
     }
@@ -726,12 +806,16 @@ export async function parseCursorTranscriptFile(
   verbose = false
 ): Promise<CursorTranscriptTurn[]> {
   let fileSize = 0;
-  let occurredAt = new Date().toISOString();
+  let fileMtimeIso = new Date().toISOString();
+  let fileBirthIso: string | null = null;
 
   try {
     const stat = statSync(filePath);
     fileSize = stat.size;
-    occurredAt = stat.mtime.toISOString();
+    fileMtimeIso = stat.mtime.toISOString();
+    if (stat.birthtime && !Number.isNaN(stat.birthtime.getTime()) && stat.birthtime.getTime() > 0) {
+      fileBirthIso = stat.birthtime.toISOString();
+    }
   } catch {
     return [];
   }
@@ -745,15 +829,29 @@ export async function parseCursorTranscriptFile(
 
   const sessionId = basename(filePath, ".jsonl");
   const header = composerHeaders.get(sessionId);
-  if (header?.lastUpdatedAt) occurredAt = header.lastUpdatedAt;
+  const sessionFallback = header?.lastUpdatedAt ?? fileMtimeIso;
+  const sessionStart = header?.createdAt ?? fileBirthIso ?? sessionFallback;
+  const sessionEnd = header?.lastUpdatedAt ?? fileMtimeIso;
 
-  const turns: CursorTranscriptTurn[] = [];
+  type DraftTurn = Omit<CursorTranscriptTurn, "occurredAt" | "contentHash"> & {
+    turnOccurredAt: string | null;
+  };
+
+  const drafts: DraftTurn[] = [];
   let currentPromptParts: string[] = [];
   let currentAssistantParts: string[] = [];
+  let currentTurnOccurredAt: string | null = null;
   let turnIndex = 0;
   const hasher = createHash("sha256");
   const stream = createReadStream(filePath, { encoding: "utf-8" });
   const rl = createInterface({ input: stream, crlfDelay: Infinity });
+
+  const noteLineTime = (entry: CursorTranscriptLine): void => {
+    const lineAt = extractLineOccurredAt(entry);
+    if (!lineAt) return;
+    // Prefer the first timestamp in the turn (usually the user message).
+    if (!currentTurnOccurredAt) currentTurnOccurredAt = lineAt;
+  };
 
   const finalizeTurn = (): void => {
     const promptText = currentPromptParts.join("\n\n").trim();
@@ -762,14 +860,14 @@ export async function parseCursorTranscriptFile(
 
     const risk = scanText(promptText);
     turnIndex += 1;
-    turns.push({
+    drafts.push({
       turnId: `${sessionId}:${turnIndex}`,
       sessionId,
       filePath,
       fileSize,
       workspacePath: header?.workspacePath ?? workspaceFromTranscriptFile(filePath),
       composerName: header?.name ?? null,
-      occurredAt,
+      turnOccurredAt: currentTurnOccurredAt,
       promptText,
       assistantText,
       tokensIn: estimateTokens(promptText),
@@ -778,6 +876,7 @@ export async function parseCursorTranscriptFile(
       riskScore: risk.risk_score,
       riskCategories: risk.risk_categories,
     });
+    currentTurnOccurredAt = null;
   };
 
   let lineNumber = 0;
@@ -802,14 +901,23 @@ export async function parseCursorTranscriptFile(
       if (texts.length === 0) continue;
 
       if (entry.role === "user") {
+        // Normalize/filter before noting the time: a whitespace- or wrapper-only line
+        // must not set currentTurnOccurredAt (nor start a new turn) with nothing to append,
+        // otherwise the next real message inherits this stale timestamp.
+        const fragments = texts.map(stripUserQueryWrapper).filter((text) => text.length > 0);
+        if (fragments.length === 0) continue;
         if (currentPromptParts.length > 0 || currentAssistantParts.length > 0) {
           finalizeTurn();
           currentPromptParts = [];
           currentAssistantParts = [];
         }
-        currentPromptParts.push(...texts.map(stripUserQueryWrapper).filter((text) => text.length > 0));
+        noteLineTime(entry);
+        currentPromptParts.push(...fragments);
       } else if (entry.role === "assistant") {
-        currentAssistantParts.push(...texts.map((text) => text.trim()).filter((text) => text.length > 0));
+        const fragments = texts.map((text) => text.trim()).filter((text) => text.length > 0);
+        if (fragments.length === 0) continue;
+        noteLineTime(entry);
+        currentAssistantParts.push(...fragments);
       }
     }
   } catch (err) {
@@ -825,8 +933,18 @@ export async function parseCursorTranscriptFile(
 
   finalizeTurn();
   const contentHash = hasher.digest("hex").slice(0, 32);
-  for (const t of turns) t.contentHash = contentHash;
-  return turns;
+  const total = drafts.length;
+
+  return drafts.map((draft, index) => {
+    const { turnOccurredAt, ...rest } = draft;
+    return {
+      ...rest,
+      contentHash,
+      occurredAt:
+        turnOccurredAt ??
+        interpolateTurnOccurredAt(sessionStart, sessionEnd, index, total, sessionFallback),
+    };
+  });
 }
 
 export async function readCursorTranscriptSessions(
@@ -894,6 +1012,7 @@ export type Db90CursorPayloadMetadata = {
   generation_id?: string;
   hook_tool_name?: string;
   duration_ms?: number;
+  model_resolution?: "settings_json" | "state_vscdb" | "unresolved";
 };
 
 export interface CursorDb90Payload extends IngestPayload {
@@ -980,6 +1099,7 @@ function buildPayload(opts: {
   dbPath: string;
   date: string;
   model?: string;
+  modelResolution?: Db90CursorPayloadMetadata["model_resolution"];
   modelKey?: string;
   projectId?: string;
   costModel?: CursorLineCostModel | CursorTokenCostModel;
@@ -993,6 +1113,7 @@ function buildPayload(opts: {
     dbPath,
     date,
     model = "unknown",
+    modelResolution,
     modelKey,
     projectId,
     costModel = LINE_COST_MODEL,
@@ -1012,6 +1133,7 @@ function buildPayload(opts: {
       cost_model: costModel,
       scannable: false,
       risk_level: "none",
+      ...(modelResolution !== undefined ? { model_resolution: modelResolution } : {}),
     },
   };
   if (projectId) payload.project_id = projectId;
@@ -1022,7 +1144,8 @@ export function mapDailyStats(
   entry: DailyStatsEntry,
   projectId?: string,
   pricing: PricingConfig = DEFAULT_CURSOR_PRICING,
-  model?: string
+  model?: string,
+  modelResolution?: Db90CursorPayloadMetadata["model_resolution"]
 ): CursorDb90Payload[] {
   const { date, value, dbPath } = entry;
   const occurredAt = `${date}T00:00:00.000Z`;
@@ -1048,6 +1171,7 @@ export function mapDailyStats(
         dbPath,
         date,
         model,
+        modelResolution,
         projectId,
       })
     );
@@ -1064,6 +1188,7 @@ export function mapDailyStats(
         dbPath,
         date,
         model,
+        modelResolution,
         projectId,
       })
     );
@@ -1106,7 +1231,8 @@ export function mapRecentCommit(
   entry: RecentCommitSnapshot,
   projectId?: string,
   pricing: PricingConfig = DEFAULT_CURSOR_PRICING,
-  model?: string
+  model?: string,
+  modelResolution?: Db90CursorPayloadMetadata["model_resolution"]
 ): CursorDb90Payload | null {
   const { value: obj, dbPath } = entry;
   const occurredAt = toIsoString(obj.timestamp as number | string | null | undefined);
@@ -1155,6 +1281,7 @@ export function mapRecentCommit(
             : undefined,
       scannable: false,
       risk_level: "none",
+      ...(modelResolution !== undefined ? { model_resolution: modelResolution } : {}),
     },
   };
   if (projectId) payload.project_id = projectId;
@@ -1201,7 +1328,8 @@ export function mapTranscriptTurn(
   turn: CursorTranscriptTurn,
   projectId?: string,
   pricing: PricingConfig = DEFAULT_CURSOR_PRICING,
-  model?: string
+  model?: string,
+  modelResolution?: Db90CursorPayloadMetadata["model_resolution"]
 ): CursorDb90Payload {
   const payload: CursorDb90Payload = {
     tool_name: "cursor",
@@ -1224,6 +1352,7 @@ export function mapTranscriptTurn(
       composer_name: turn.composerName ?? undefined,
       prompt_text: turn.promptText || undefined,
       assistant_text: turn.assistantText || undefined,
+      ...(modelResolution !== undefined ? { model_resolution: modelResolution } : {}),
     },
   };
   if (projectId) payload.project_id = projectId;

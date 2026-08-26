@@ -3,7 +3,7 @@
 module ToolEvents
   # Creates or updates a tool_event, deduplicating on session_id.
   #
-  # Context: db90-claude (the CLI connector) re-sends a session when its JSONL
+  # Context: the CLI connector (@aixle/insights) re-sends a session when its JSONL
   # transcript file grows. Each re-send should UPDATE the existing record (with
   # the latest aggregated token counts) rather than create a new row. Without
   # this, the Events page accumulates duplicate rows that inflate apparent cost.
@@ -42,6 +42,8 @@ module ToolEvents
     # those unreliable inputs (char/4 token estimates), so it must be nilled too —
     # otherwise the fabricated cost keeps inflating cost aggregations. Line-count
     # events keep their cost: it is a legitimate line-based estimate, not char/4.
+    # Note: "derivative" (Claude tool-use children) is intentionally absent — those events
+    # carry no tokens at all, so there is nothing to relocate. enrich_cost! is a no-op for them.
     ESTIMATED_METRICS_KEYS = {
       "estimated_line_count"      => { in_key: "lines_suggested",     out_key: "lines_accepted",      fabricated_cost: false },
       "estimated_transcript_text" => { in_key: "tokens_estimated_in", out_key: "tokens_estimated_out", fabricated_cost: true }

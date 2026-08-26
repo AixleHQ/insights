@@ -132,7 +132,12 @@ const mockMembers = [
 
 function setupDefaultMocks() {
   mockHasRole.mockReturnValue(false);
-  mockUseProject.mockReturnValue({ data: mockProject, isLoading: false });
+  mockUseProject.mockReturnValue({
+    data: mockProject,
+    isLoading: false,
+    isFetching: false,
+    isFetchedAfterMount: true,
+  });
   mockUseEvents.mockReturnValue({ data: { data: [] }, isLoading: false });
   mockUseEvent.mockReturnValue({ data: undefined, isLoading: false });
   mockUseDeleteProject.mockReturnValue({ mutateAsync: vi.fn() });
@@ -162,6 +167,68 @@ describe("ProjectDetail", () => {
     render(<ProjectDetail />);
 
     expect(screen.getByText("Project not found")).toBeInTheDocument();
+  });
+
+  describe("access denied after leaving/removed from org (AIX-611)", () => {
+    it("denies access on a 404 even when stale project data is still cached", () => {
+      // The user left the org; the API now 404s, but React Query may still return the
+      // previously fetched project from cache. The error state must win.
+      mockUseProject.mockReturnValue({
+        data: mockProject,
+        isLoading: false,
+        isError: true,
+        error: new ApiError("Not found", 404),
+      });
+      render(<ProjectDetail />);
+
+      expect(screen.getByText("Project not found")).toBeInTheDocument();
+      expect(screen.queryByText("A test project")).not.toBeInTheDocument();
+    });
+
+    it("denies access on a 403", () => {
+      mockUseProject.mockReturnValue({
+        data: mockProject,
+        isLoading: false,
+        isError: true,
+        error: new ApiError("Forbidden", 403),
+      });
+      render(<ProjectDetail />);
+
+      expect(screen.getByText("Project not found")).toBeInTheDocument();
+      expect(screen.queryByText("A test project")).not.toBeInTheDocument();
+    });
+
+    it("denies access on a duck-typed 404 error (not only ApiError instanceof)", () => {
+      mockUseProject.mockReturnValue({
+        data: mockProject,
+        isLoading: false,
+        isFetching: false,
+        isFetchedAfterMount: true,
+        isError: true,
+        // Simulate a non-ApiError shape that still carries status (HMR / rehydrate edge).
+        error: { message: "Not found", status: 404 },
+      });
+      render(<ProjectDetail />);
+
+      expect(screen.getByText("Project not found")).toBeInTheDocument();
+      expect(screen.queryByText("A test project")).not.toBeInTheDocument();
+    });
+
+    it("shows loading skeleton while revalidating cached project access on mount", () => {
+      // Cached data + in-flight mount refetch — must not flash revoked project content.
+      mockUseProject.mockReturnValue({
+        data: mockProject,
+        isLoading: false,
+        isFetching: true,
+        isFetchedAfterMount: false,
+        isError: false,
+        error: null,
+      });
+      render(<ProjectDetail />);
+
+      expect(screen.queryByText("My Project")).not.toBeInTheDocument();
+      expect(screen.queryByText("Project not found")).not.toBeInTheDocument();
+    });
   });
 
   it("renders project name and description", () => {

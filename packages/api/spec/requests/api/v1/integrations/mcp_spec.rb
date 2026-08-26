@@ -186,6 +186,21 @@ RSpec.describe "Api::V1::Integrations::Mcp", type: :request do
       end
     end
 
+    context "when the user has exactly one organization membership" do
+      it "binds the sole membership silently when the user has exactly one org" do
+        solo = create(:user, email: "solo@example.com")
+        solo_membership = create(:organization_membership, user: solo)
+
+        expect {
+          authenticated_post "/api/v1/integrations/mcp/exchange",
+                             user: solo,
+                             params: { tool_name: "claude_code" }
+        }.to change { solo_membership.reload.user_tool_accounts.count }.by(1)
+
+        expect(response).to have_http_status(:created)
+      end
+    end
+
     context "when the user has two organization memberships" do
       let(:multi_user) { create(:user, email: "two-orgs@example.com") }
       let(:primary_org) { create(:organization) }
@@ -218,16 +233,71 @@ RSpec.describe "Api::V1::Integrations::Mcp", type: :request do
         expect(account.organization_membership_id).to eq(secondary_membership.id)
       end
 
-      it "falls back to the oldest membership when X-Organization-ID is absent" do
+      it "returns 422 organization_selection_required when no default_org_id is set" do
+        # Deliberately name the orgs out of insertion order so the name-ASC assertion
+        # would fail if the controller stopped sorting the org list.
+        sorting_user = create(:user, email: "sorting@example.com")
+        zulu_org = create(:organization, name: "Zulu Org")
+        alpha_org = create(:organization, name: "Alpha Org")
+        zulu_membership = create(:organization_membership, user: sorting_user, organization: zulu_org)
+        alpha_membership = create(:organization_membership, user: sorting_user, organization: alpha_org)
+
+        expect {
+          authenticated_post "/api/v1/integrations/mcp/exchange",
+                             user: sorting_user,
+                             params: { tool_name: "claude_code" }
+        }.to change { zulu_membership.reload.user_tool_accounts.count }.by(0)
+          .and change { alpha_membership.reload.user_tool_accounts.count }.by(0)
+
+        expect(response).to have_http_status(:unprocessable_content)
+        parsed = JSON.parse(response.body)
+        expect(parsed["error"]).to eq("organization_selection_required")
+        expect(parsed["message"]).to include("2 organizations")
+        ids = parsed["organizations"].map { |o| o["id"] }
+        expect(ids).to contain_exactly(zulu_org.id.to_s, alpha_org.id.to_s)
+        names = parsed["organizations"].map { |o| o["name"] }
+        expect(names).to eq([ "Alpha Org", "Zulu Org" ]) # name ASC, not insertion order
+        expect(parsed["organizations"].first).to include("role")
+      end
+
+      it "binds the default_org_id membership when the preference is set" do
+        UserSetting.set(multi_user, "default_org_id", secondary_org.id.to_s)
+
         expect {
           authenticated_post "/api/v1/integrations/mcp/exchange",
                              user: multi_user,
                              params: { tool_name: "claude_code" }
-        }.to change { primary_membership.reload.user_tool_accounts.count }.by(1)
-          .and change { secondary_membership.reload.user_tool_accounts.count }.by(0)
+        }.to change { secondary_membership.reload.user_tool_accounts.count }.by(1)
+          .and change { primary_membership.reload.user_tool_accounts.count }.by(0)
 
         expect(response).to have_http_status(:created)
-        expect(JSON.parse(response.body)["data"]["organizationId"]).to eq(primary_org.id.to_s)
+        expect(JSON.parse(response.body)["data"]["organizationId"]).to eq(secondary_org.id.to_s)
+      end
+
+      it "returns 422 when default_org_id is stale (user no longer a member)" do
+        UserSetting.set(multi_user, "default_org_id", create(:organization).id.to_s)
+
+        authenticated_post "/api/v1/integrations/mcp/exchange",
+                           user: multi_user,
+                           params: { tool_name: "claude_code" }
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(JSON.parse(response.body)["error"]).to eq("organization_selection_required")
+      end
+
+      it "binds the sole remaining membership when default_org_id is stale and only one membership remains" do
+        solo = create(:user, email: "stale-solo@example.com")
+        sole_membership = create(:organization_membership, user: solo)
+        UserSetting.set(solo, "default_org_id", create(:organization).id.to_s)
+
+        expect {
+          authenticated_post "/api/v1/integrations/mcp/exchange",
+                             user: solo,
+                             params: { tool_name: "claude_code" }
+        }.to change { sole_membership.reload.user_tool_accounts.count }.by(1)
+
+        expect(response).to have_http_status(:created)
+        expect(JSON.parse(response.body)["data"]["organizationId"]).to eq(sole_membership.organization_id.to_s)
       end
 
       it "returns 403 and does not touch tool accounts when X-Organization-ID is not a membership org" do

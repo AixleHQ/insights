@@ -37,17 +37,24 @@ module Api
         # Get usage stats for all users in this org in a single query
         user_ids = memberships.map { |m| m.user_id }
 
-        user_stats = current_organization.tool_events
+        range_start = member_stats_range_start
+        scoped_events = range_start ? current_organization.tool_events.where(occurred_at: range_start..) : current_organization.tool_events
+
+        user_stats = scoped_events
           .where(user_id: user_ids)
           .group(:user_id)
           .select(
             "user_id",
             "COALESCE(SUM(tokens_in), 0) + COALESCE(SUM(tokens_out), 0) as total_tokens",
             "COUNT(*) as total_events",
-            "COALESCE(SUM(cost_usd), 0) as total_cost",
-            "MAX(occurred_at) as last_active_at"
+            "COALESCE(SUM(cost_usd), 0) as total_cost"
           )
           .index_by(&:user_id)
+
+        last_active_by_user = current_organization.tool_events
+          .where(user_id: user_ids)
+          .group(:user_id)
+          .maximum(:occurred_at)
 
         cli_connected_user_ids = MemberCliConnectionQuery.connected_user_ids(
           organization_id: current_organization.id,
@@ -61,7 +68,7 @@ module Api
             total_tokens: stats&.total_tokens&.to_i || 0,
             total_events: stats&.total_events&.to_i || 0,
             total_cost:   stats&.total_cost&.to_f  || 0.0,
-            last_active_at: stats&.last_active_at&.in_time_zone&.iso8601,
+            last_active_at: last_active_by_user[membership.user_id]&.in_time_zone&.iso8601,
             cli_connected: cli_connected_user_ids.include?(membership.user_id)
           )
         end
@@ -407,12 +414,48 @@ module Api
         cost_change   = prev_cost   > 0 ? ((curr_cost   - prev_cost).to_f   / prev_cost   * 100).round(1) : 0
         tokens_change = prev_tokens > 0 ? ((curr_tokens - prev_tokens).to_f / prev_tokens * 100).round(1) : 0
 
-        tool_breakdown = base
-          .where(occurred_at: current_start..Time.current)
+        period_events = base.where(occurred_at: current_start..Time.current)
+
+        tool_breakdown = period_events
           .group(:tool_name)
-          .select("tool_name, COUNT(*) as event_count, COALESCE(SUM(cost_usd), 0) as cost_usd")
+          .select(<<~SQL.squish)
+            tool_name,
+            COUNT(*) as event_count,
+            COALESCE(SUM(tokens_in), 0) as tokens_in,
+            COALESCE(SUM(tokens_out), 0) as tokens_out,
+            COALESCE(SUM(cost_usd), 0) as cost_usd
+          SQL
           .order("event_count DESC")
-          .map { |t| { tool_name: t.tool_name, event_count: t.event_count.to_i, cost_usd: t.cost_usd.to_f } }
+          .map do |t|
+            {
+              tool_name:   t.tool_name,
+              event_count: t.event_count.to_i,
+              tokens_in:   t.tokens_in.to_i,
+              tokens_out:  t.tokens_out.to_i,
+              cost_usd:    t.cost_usd.to_f
+            }
+          end
+
+        model_breakdown = period_events
+          .where.not(model: [ nil, "" ])
+          .group(:model)
+          .select(<<~SQL.squish)
+            model,
+            COUNT(*) as event_count,
+            COALESCE(SUM(tokens_in), 0) as tokens_in,
+            COALESCE(SUM(tokens_out), 0) as tokens_out,
+            COALESCE(SUM(cost_usd), 0) as cost_usd
+          SQL
+          .order("event_count DESC")
+          .map do |m|
+            {
+              model:       m.model,
+              event_count: m.event_count.to_i,
+              tokens_in:   m.tokens_in.to_i,
+              tokens_out:  m.tokens_out.to_i,
+              cost_usd:    m.cost_usd.to_f
+            }
+          end
 
         render json: {
           total_events:          curr_events,
@@ -422,7 +465,8 @@ module Api
           events_change_percent: events_change,
           cost_change_percent:   cost_change,
           tokens_change_percent: tokens_change,
-          tool_breakdown:        tool_breakdown
+          tool_breakdown:        tool_breakdown,
+          model_breakdown:       model_breakdown
         }
       end
 

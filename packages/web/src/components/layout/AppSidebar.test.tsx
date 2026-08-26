@@ -243,14 +243,14 @@ describe("AppSidebar", () => {
       impersonationMock.isImpersonating = true;
       currentUserMock.data = {
         name: "Edsger Dijkstra",
-        email: "edsger@example.com",
+        email: "ana@example.com",
         avatarUrl: null,
       };
 
       renderSidebar();
 
       expect(screen.getByText("Edsger Dijkstra")).toBeInTheDocument();
-      expect(screen.getByText("edsger@example.com")).toBeInTheDocument();
+      expect(screen.getByText("ana@example.com")).toBeInTheDocument();
       expect(screen.queryByText("Test User")).not.toBeInTheDocument();
     });
   });

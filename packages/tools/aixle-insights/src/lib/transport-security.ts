@@ -19,7 +19,7 @@ function isIpv4Loopback(hostname: string): boolean {
   ) && octets[0] === 127;
 }
 
-function isLoopbackHost(hostname: string): boolean {
+export function isLoopbackHost(hostname: string): boolean {
   const normalized = hostname.toLowerCase();
   return normalized === "localhost" ||
     normalized === "::1" ||

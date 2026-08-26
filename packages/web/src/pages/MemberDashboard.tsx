@@ -13,6 +13,7 @@ import {
   MEMBER_PERIOD_LABELS,
   type MemberPeriod,
   type ToolUsageData,
+  MemberUsageTable,
 } from "@/components/dashboard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatCardSkeleton } from "@/components/ui/skeletons";
@@ -191,10 +192,16 @@ export function MemberDashboard({
       )}
 
       {heatmapData ? (
-        <ActivityHeatmap data={heatmapData} />
+        <ActivityHeatmap data={heatmapData} summaryMode="last_year" />
       ) : (
         <Skeleton className="h-32 w-full" />
       )}
+
+      <MemberUsageTable
+        toolBreakdown={stats?.tool_breakdown ?? []}
+        modelBreakdown={stats?.model_breakdown ?? []}
+        isLoading={isLoadingStats}
+      />
     </div>
   );
 }

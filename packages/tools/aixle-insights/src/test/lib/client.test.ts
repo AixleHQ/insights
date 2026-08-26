@@ -222,9 +222,77 @@ describe("postEvent — security", () => {
     }
   });
 
-  it("file:// host gracefully returns false (fetch rejects)", async () => {
+  it("file:// host is rejected by the transport-security gate before fetch", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
     vi.spyOn(console, "error").mockImplementation(() => {});
-    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("fetch failed")));
     expect(await postEvent(payload, "file:///etc/passwd", "tok")).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("postEvent — transport security", () => {
+  it("rejects a remote http host and never calls fetch", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(await postEvent(payload, "http://attacker.example", "tok")).toBe(false);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("attacker.example"));
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("plaintext HTTP"));
+  });
+
+  it("does not mark a rejected send as retry-eligible", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const onNetworkError = vi.fn();
+    const onHttpError = vi.fn();
+
+    await postEvent(payload, "http://attacker.example", "tok", { onNetworkError, onHttpError });
+
+    expect(onNetworkError).not.toHaveBeenCalled();
+    expect(onHttpError).not.toHaveBeenCalled();
+  });
+
+  it("allows a remote http host when allowInsecureHttp is true, with a warning", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, status: 200, text: () => Promise.resolve("") });
+    vi.stubGlobal("fetch", fetchMock);
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(
+      await postEvent(payload, "http://trusted-staging.example", "tok", { allowInsecureHttp: true })
+    ).toBe(true);
+
+    expect(fetchMock).toHaveBeenCalled();
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("Warning:"));
+  });
+
+  it("still allows loopback http with no allowInsecureHttp and no warning", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: true, status: 200, text: () => Promise.resolve("") });
+    vi.stubGlobal("fetch", fetchMock);
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    expect(await postEvent(payload, "http://localhost:3000", "tok")).toBe(true);
+
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
+  it("never echoes the bearer token when blocking an insecure send", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await postEvent(payload, "http://attacker.example", "super-secret-token-xyz");
+
+    for (const call of errSpy.mock.calls) {
+      for (const arg of call) {
+        expect(String(arg)).not.toContain("super-secret-token-xyz");
+      }
+    }
   });
 });

@@ -45,6 +45,7 @@ vi.mock("@/hooks/useApi", () => ({
   useConnectors: vi.fn(),
   useConnectorSyncStatus: vi.fn(),
   useSyncConnector: vi.fn(),
+  useProjects: vi.fn(),
 }));
 
 import {
@@ -56,6 +57,7 @@ import {
   useConnectors,
   useConnectorSyncStatus,
   useSyncConnector,
+  useProjects,
 } from "@/hooks/useApi";
 
 const mockUseActiveTools = vi.mocked(useActiveTools);
@@ -66,6 +68,7 @@ const mockUseToolEventTypes = vi.mocked(useToolEventTypes);
 const mockUseConnectors = vi.mocked(useConnectors);
 const mockUseConnectorSyncStatus = vi.mocked(useConnectorSyncStatus);
 const mockUseSyncConnector = vi.mocked(useSyncConnector);
+const mockUseProjects = vi.mocked(useProjects);
 
 function makeActiveTools(tools: Array<{ tool_name: string; total_events: number }>) {
   return {
@@ -117,6 +120,10 @@ function setupDefaults() {
   mockUseConnectors.mockReturnValue(noConnectors as never);
   mockUseConnectorSyncStatus.mockReturnValue(noSyncStatus as never);
   mockUseSyncConnector.mockReturnValue(makeNoMutate() as never);
+  mockUseProjects.mockReturnValue({
+    data: [{ id: "proj-9", name: "Aixle Insights" }],
+    isLoading: false,
+  } as never);
 }
 
 describe("ToolInsightsSection", () => {
@@ -216,6 +223,31 @@ describe("ToolInsightsSection", () => {
     } as never);
     render(<ToolInsightsSection {...defaultProps} />);
     expect(screen.getByText(/No Cursor events in the last 30 days/i)).toBeInTheDocument();
+  });
+
+  // QA AIX-114: Tokens In / Out must render even when totals are 0 (e.g. 7d / 30d)
+  it("always shows Tokens In and Tokens Out cards when events exist but token totals are 0", () => {
+    mockUseActiveTools.mockReturnValue(makeActiveTools([{ tool_name: "cursor", total_events: 5 }]) as never);
+    setupDefaults();
+    mockUseToolDaily.mockReturnValue({
+      data: {
+        tool: "cursor",
+        timeRange: { start: "", end: "" },
+        daily: [
+          { date: "2026-04-01", eventCount: 5, tokensIn: 0, tokensOut: 0, costUsd: 0.01 },
+        ],
+      },
+      isLoading: false,
+    } as never);
+    render(<ToolInsightsSection {...defaultProps} />);
+    // Assert StatCard titles (ToolModelTable also has Tokens In/Out column headers)
+    expect(
+      screen.getAllByText("Tokens In").some((el) => el.getAttribute("data-slot") === "card-title")
+    ).toBe(true);
+    expect(
+      screen.getAllByText("Tokens Out").some((el) => el.getAttribute("data-slot") === "card-title")
+    ).toBe(true);
+    expect(screen.queryByText("Models Used")).not.toBeInTheDocument();
   });
 
   it("shows sync status subsection when active connector exists for tool", () => {
@@ -338,5 +370,43 @@ describe("ToolInsightsSection", () => {
       )
     );
     expect(toast.error).toHaveBeenCalled();
+  });
+
+  it("shows org-wide subtitle when no project is selected", () => {
+    mockUseActiveTools.mockReturnValue(makeActiveTools([{ tool_name: "cursor", total_events: 5 }]) as never);
+    setupDefaults();
+    render(<ToolInsightsSection {...defaultProps} />);
+    expect(screen.getByText("Insights across your organization · Last 30 days")).toBeInTheDocument();
+  });
+
+  it("shows unassigned subtitle when projectId is 'none'", () => {
+    mockUseActiveTools.mockReturnValue(makeActiveTools([{ tool_name: "cursor", total_events: 5 }]) as never);
+    setupDefaults();
+    render(<ToolInsightsSection {...defaultProps} projectId="none" />);
+    expect(screen.getByText("Insights not assigned to a project · Last 30 days")).toBeInTheDocument();
+  });
+
+  it("shows the resolved project name in the subtitle", () => {
+    mockUseActiveTools.mockReturnValue(makeActiveTools([{ tool_name: "cursor", total_events: 5 }]) as never);
+    setupDefaults();
+    render(<ToolInsightsSection {...defaultProps} projectId="proj-9" />);
+    expect(screen.getByText("Insights for Aixle Insights · Last 30 days")).toBeInTheDocument();
+  });
+
+  it("falls back to a generic project label when the project name hasn't resolved yet", () => {
+    mockUseActiveTools.mockReturnValue(makeActiveTools([{ tool_name: "cursor", total_events: 5 }]) as never);
+    setupDefaults();
+    render(<ToolInsightsSection {...defaultProps} projectId="unknown-id" />);
+    expect(screen.getByText("Insights for the selected project · Last 30 days")).toBeInTheDocument();
+  });
+
+  it("reflects the selected day range in the subtitle", () => {
+    mockUseActiveTools.mockReturnValue(makeActiveTools([{ tool_name: "cursor", total_events: 5 }]) as never);
+    setupDefaults();
+    const { rerender } = render(<ToolInsightsSection {...defaultProps} days={7} />);
+    expect(screen.getByText("Insights across your organization · Last 7 days")).toBeInTheDocument();
+
+    rerender(<ToolInsightsSection {...defaultProps} days={365} />);
+    expect(screen.getByText("Insights across your organization · Last 1 year")).toBeInTheDocument();
   });
 });

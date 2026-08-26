@@ -1,13 +1,15 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useProject, useUpdateProject } from "@/hooks/useApi";
+import { useUpdateProject } from "@/hooks/useApi";
+import { useProjectAccess } from "@/hooks/useProjectAccess";
 import { ProjectForm, type ProjectFormData } from "@/components/projects";
+import { ProjectNotFound } from "@/components/project";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AppRoutes } from "@/lib/routes";
 
 export function EditProject() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data: project, isLoading } = useProject(id || "");
+  const { project, isLoading, isAccessDenied } = useProjectAccess(id || "");
   const updateProject = useUpdateProject();
 
   const handleSubmit = async (data: ProjectFormData) => {
@@ -42,12 +44,8 @@ export function EditProject() {
     );
   }
 
-  if (!project) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <p className="text-muted-foreground">Project not found</p>
-      </div>
-    );
+  if (isAccessDenied || !project) {
+    return <ProjectNotFound />;
   }
 
   return (

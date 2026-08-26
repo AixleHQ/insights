@@ -76,6 +76,59 @@ describe("exchangeIngestToken", () => {
     expect(headers.Authorization).toBe("Bearer kc-secret");
   });
 
+  it("throws OrganizationSelectionRequiredError with the org list on 422 organization_selection_required", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: "organization_selection_required",
+          message: "You belong to 2 organizations...",
+          organizations: [
+            { id: "11111111-1111-1111-1111-111111111111", name: "Acme", role: "owner" },
+            { id: "22222222-2222-2222-2222-222222222222", name: "Globex", role: "member" },
+          ],
+        }),
+        { status: 422 }
+      )
+    );
+
+    await expect(
+      exchangeIngestToken({
+        db90Host: "https://api.example",
+        keycloakAccessToken: "tok",
+        toolName: "claude_code",
+        fetchImpl,
+      })
+    ).rejects.toMatchObject({
+      name: "OrganizationSelectionRequiredError",
+      organizations: [{ name: "Acme" }, { name: "Globex" }],
+    });
+  });
+
+  it("skips null/non-object organizations entries without throwing", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: "organization_selection_required",
+          message: "You belong to 1 organizations...",
+          organizations: [null, { id: "11111111-1111-1111-1111-111111111111", name: "Acme", role: "owner" }, "x"],
+        }),
+        { status: 422 }
+      )
+    );
+
+    await expect(
+      exchangeIngestToken({
+        db90Host: "https://api.example",
+        keycloakAccessToken: "tok",
+        toolName: "claude_code",
+        fetchImpl,
+      })
+    ).rejects.toMatchObject({
+      name: "OrganizationSelectionRequiredError",
+      organizations: [{ id: "11111111-1111-1111-1111-111111111111", name: "Acme", role: "owner" }],
+    });
+  });
+
   it("maps a legacy flat token response to the requested cursor tool", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(
       new Response(

@@ -251,12 +251,20 @@ module Api
         status_counts     = all_connectors.group(:status).count
         snapshot_stats    = ConnectorHealthSnapshot.stats_for_org(current_organization.id, since: 7.days.ago)
 
+        stale_ids = active_connectors.select(&:stale?).map(&:id).to_set
+        stuck_ids = active_connectors.select(&:stuck?).map(&:id).to_set
+
+        # stale/stuck/healthy are derived overlays on the status counts, not a partition:
+        # stale ⊆ connected, stuck ⊆ testing. They do not sum to total.
         summary = {
           total:        status_counts.values.sum,
           connected:    status_counts.fetch("connected", 0),
           testing:      status_counts.fetch("testing", 0),
           error:        status_counts.fetch("error", 0),
-          disconnected: status_counts.fetch("disconnected", 0)
+          disconnected: status_counts.fetch("disconnected", 0),
+          stale:        stale_ids.size,
+          stuck:        stuck_ids.size,
+          healthy:      active_connectors.count(&:healthy?)
         }
 
         connectors_data = active_connectors.map do |c|
@@ -268,6 +276,8 @@ module Api
             status:                  c.status,
             last_sync_at:            c.last_sync_at&.iso8601,
             last_error:              c.last_error,
+            stale:                   stale_ids.include?(c.id),
+            stuck:                   stuck_ids.include?(c.id),
             success_rate_7d:         total > 0 ? (st[:success_count].to_f / total).round(4) : nil,
             avg_sync_duration_ms_7d: st[:avg_duration_ms]&.round(1)
           }

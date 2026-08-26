@@ -17,7 +17,7 @@ import type { ChartConfig } from "@/components/ui/chart";
 import { ChartSkeleton } from "@/components/ui/skeletons";
 import { ErrorState } from "@/components/ui/error-state";
 import { RangeSegmentedControl } from "@/components/dashboard/RangeSegmentedControl";
-import { formatDateLabel, sliceCostTrendWindow } from "@/lib/dashboardUtils";
+import { formatDateLabel, projectScopeLabel, sliceCostTrendWindow } from "@/lib/dashboardUtils";
 import { formatCost } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +34,8 @@ interface CostTrendChartProps {
   onRetry?: () => void;
   allTime?: boolean;
   monthScoped?: boolean;
+  projectId?: string;
+  projects?: { id: string; name: string }[];
   className?: string;
 }
 
@@ -63,6 +65,8 @@ export function CostTrendChart({
   onRetry,
   allTime = false,
   monthScoped = false,
+  projectId,
+  projects,
   className,
 }: CostTrendChartProps) {
   const [timeRange, setTimeRange] = useState<TimeRange>("7d");
@@ -80,6 +84,7 @@ export function CostTrendChart({
   const avgCost = filteredData.length > 0 ? totalCost / filteredData.length : 0;
   const avgLabel = allTime ? `${formatCost(avgCost)}/mo` : `${formatCost(avgCost)}/day`;
   const showEveryTick = formattedData.length <= 31;
+  const scopeLabel = projects ? projectScopeLabel(projectId, projects, "Cost data") : undefined;
 
   return (
     <Card className={cn("col-span-full lg:col-span-2", className)}>
@@ -87,7 +92,7 @@ export function CostTrendChart({
         <div>
           <CardTitle className="text-base font-medium">Cost Trend</CardTitle>
           <CardDescription className="text-xs">
-            Total: {formatCost(totalCost)} | Avg: {avgLabel}
+            {scopeLabel && `${scopeLabel} · `}Total: {formatCost(totalCost)} | Avg: {avgLabel}
           </CardDescription>
         </div>
         {!allTime && (

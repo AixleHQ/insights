@@ -69,6 +69,35 @@ RSpec.describe OrganizationMembership, type: :model do
     end
   end
 
+  describe 'project membership cascade on destroy (AIX-611)' do
+    let(:organization) { create(:organization) }
+    let(:user) { create(:user) }
+
+    it 'removes the user\'s project memberships on the org\'s projects' do
+      create(:organization_membership, organization: organization, role: 'owner')
+      membership = create(:organization_membership, user: user, organization: organization, role: 'member')
+      project = create(:project, organization: organization, owner: nil)
+      create(:project_membership, user: user, project: project, role: 'member')
+
+      expect { membership.destroy }.to change {
+        ProjectMembership.where(user: user, project: project).count
+      }.from(1).to(0)
+    end
+
+    it 'leaves the user\'s project memberships on other orgs untouched' do
+      create(:organization_membership, organization: organization, role: 'owner')
+      membership = create(:organization_membership, user: user, organization: organization, role: 'member')
+
+      other_org = create(:organization)
+      create(:organization_membership, user: user, organization: other_org, role: 'member')
+      other_project = create(:project, organization: other_org, owner: nil)
+      other_pm = create(:project_membership, user: user, project: other_project, role: 'member')
+
+      membership.destroy
+      expect(ProjectMembership.exists?(other_pm.id)).to be true
+    end
+  end
+
   describe 'scopes' do
     let(:organization) { create(:organization) }
 

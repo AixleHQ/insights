@@ -20,3 +20,4 @@ export { RangeSegmentedControl, type RangeOption } from "./RangeSegmentedControl
 export { ProjectFilterDropdown } from "./ProjectFilterDropdown";
 export { MemberPeriodSelect } from "./MemberPeriodSelect";
 export { MEMBER_PERIODS, MEMBER_PERIOD_LABELS, type MemberPeriod } from "./memberPeriods";
+export { MemberUsageTable } from "./MemberUsageTable";

@@ -41,6 +41,21 @@ describe("evaluateTransportSecurity", () => {
     expect(result.error).toContain("--insecure");
   });
 
+  it("rejects a stored credential host tampered from https to http (AIX-539)", () => {
+    // Simulates auth/credentials.ts's StoredCredentials.host after credentials.json
+    // was edited (by hand, malware, or corruption) to downgrade the scheme.
+    const tamperedStoredHost = "http://attacker.example";
+
+    const result = evaluateTransportSecurity(tamperedStoredHost, {
+      allowInsecureHttp: false,
+      label: "Aixle Insights ingest host",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain("attacker.example");
+    expect(result.error).toContain("plaintext HTTP");
+  });
+
   it("allows remote HTTP with an explicit warning when insecure is enabled", () => {
     const result = evaluateTransportSecurity("http://api.example.com", {
       allowInsecureHttp: true,

@@ -561,7 +561,7 @@ RSpec.describe ToolEvents::Upsert do
   # session_id). Hooks structurally cannot. If this contract breaks server-side,
   # the Events page silently shows blank fields. CI catches the regression here.
   #
-  # Parallel TS guard: packages/tools/db90-telemetry-mcp/src/test/claude-payload-contract.test.ts
+  # Parallel TS guard: packages/tools/aixle-insights/src/test/claude-payload-contract.test.ts
   describe ".call — Claude Code MCP chat path contract (AIX-192)" do
     let(:organization) { create(:organization) }
     let(:user)         { create(:user) }

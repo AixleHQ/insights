@@ -182,25 +182,13 @@ RSpec.describe "Api::V1::ProjectAuditLogs", type: :request do
       end
     end
 
-    context "when authenticated as global admin" do
-      it "returns audit logs" do
+    context "when authenticated as global admin without project membership (AIX-611)" do
+      it "returns 404 — project is outside authorized_scope" do
         authenticated_get "/api/v1/projects/#{project.id}/audit_logs",
                           user: global_admin,
                           organization: organization
 
-        expect_success
-        expect(json_data.length).to eq(3)
-      end
-
-      it "includes ip_address and tracked_changes" do
-        authenticated_get "/api/v1/projects/#{project.id}/audit_logs",
-                          user: global_admin,
-                          organization: organization
-
-        expect_success
-        log = json_data.find { |l| l[:action] == "settings.update" }
-        expect(log).to have_key(:trackedChanges)
-        expect(log).to have_key(:ipAddress)
+        expect_not_found
       end
     end
 

@@ -15,6 +15,7 @@ export interface HealthSnapshot {
   authenticated: boolean;
   configured: boolean;
   host: string | null;
+  organization_id: string | null;
   ingest_tools: TelemetryToolId[];
   app_dir: string;
   log_path: string;
@@ -106,6 +107,7 @@ export async function buildHealthSnapshot(): Promise<HealthSnapshot> {
         authenticated: false,
         configured: false,
         host: null,
+        organization_id: null,
         ingest_tools: [],
         app_dir: appDir,
         log_path: logPath,
@@ -135,6 +137,7 @@ export async function buildHealthSnapshot(): Promise<HealthSnapshot> {
       authenticated: true,
       configured: true,
       host: creds.host,
+      organization_id: creds.organizationId ?? null,
       ingest_tools,
       app_dir: appDir,
       log_path: logPath,
@@ -154,6 +157,7 @@ export async function buildHealthSnapshot(): Promise<HealthSnapshot> {
       authenticated: false,
       configured: false,
       host: null,
+      organization_id: null,
       ingest_tools: [],
       app_dir: appDir,
       log_path: logPath,
@@ -188,6 +192,7 @@ export function healthSnapshotToStatusPayload(snapshot: HealthSnapshot): Record<
     authenticated: snapshot.authenticated,
     configured: snapshot.configured,
     host: snapshot.host,
+    organization_id: snapshot.organization_id,
     ingest_tools: snapshot.ingest_tools,
     last_sync_at: lastSyncAt,
     last_result: lastResult,
@@ -209,6 +214,7 @@ export function formatHealthForCli(snapshot: HealthSnapshot): string {
   lines.push(`authenticated: ${snapshot.authenticated}`);
   lines.push(`configured: ${snapshot.configured}`);
   lines.push(`host: ${snapshot.host ?? "(none)"}`);
+  lines.push(`organization_id: ${snapshot.organization_id ?? "(none)"}`);
   lines.push(`ingest_tools: ${snapshot.ingest_tools.length ? snapshot.ingest_tools.join(", ") : "(none)"}`);
   lines.push(`state_file_paths:`);
   if (snapshot.state_file_paths.length === 0) {

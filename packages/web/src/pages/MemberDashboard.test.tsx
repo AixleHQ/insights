@@ -26,6 +26,7 @@ vi.mock("@/components/dashboard", () => ({
   PromptInsightsSection: () => <div data-testid="prompt-insights-section">Prompt Insights</div>,
   ProjectFilterDropdown: () => <div data-testid="project-filter-dropdown" />,
   MemberPeriodSelect: () => <div data-testid="member-period-select" />,
+  MemberUsageTable: () => <div data-testid="member-usage-table" />,
   MEMBER_PERIOD_LABELS: { "7d": "7 days", "30d": "30 days", "90d": "90 days" },
 }));
 
@@ -49,6 +50,11 @@ describe("MemberDashboard", () => {
   it("still renders TopToolsChart so it can fill the row", () => {
     render(<MemberDashboard />);
     expect(screen.getByTestId("top-tools-chart")).toBeInTheDocument();
+  });
+
+  it("renders the Usage table (AIX-113)", () => {
+    render(<MemberDashboard />);
+    expect(screen.getByTestId("member-usage-table")).toBeInTheDocument();
   });
 
   it("shows project and period filters in the standalone header (AIX-607)", () => {

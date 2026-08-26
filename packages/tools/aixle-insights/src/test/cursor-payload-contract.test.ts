@@ -204,6 +204,56 @@ describe("validateCursorPayload", () => {
     );
     expect(result.ok).toBe(false);
   });
+
+  it("accepts model_resolution on a daily_tab payload", () => {
+    const payload: CursorDb90Payload = {
+      tool_name: "cursor",
+      event_type: "completion",
+      model: "claude-4-sonnet",
+      tokens_in: 5,
+      tokens_out: 2,
+      cost_usd: 0.01,
+      occurred_at: "2026-05-20T00:00:00.000Z",
+      metadata: {
+        cursor_session_id: null,
+        workspace: "/tmp/ws",
+        workspace_scope: "global",
+        cost_model: "estimated_line_count",
+        scannable: false,
+        risk_level: "none",
+        model_resolution: "state_vscdb",
+      },
+    };
+    const result = validateCursorPayload(payload);
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects an invalid model_resolution value", () => {
+    const payload: CursorDb90Payload = {
+      tool_name: "cursor",
+      event_type: "completion",
+      model: "claude-4-sonnet",
+      tokens_in: 5,
+      tokens_out: 2,
+      cost_usd: 0.01,
+      occurred_at: "2026-05-20T00:00:00.000Z",
+      metadata: {
+        cursor_session_id: null,
+        workspace: "/tmp/ws",
+        workspace_scope: "global",
+        cost_model: "estimated_line_count",
+        scannable: false,
+        risk_level: "none",
+        // @ts-expect-error — intentionally invalid for this test
+        model_resolution: "made_up_source",
+      },
+    };
+    const result = validateCursorPayload(payload);
+    expect(result.ok).toBe(false);
+    expect(result.errors).toContain(
+      'metadata.model_resolution must be "settings_json", "state_vscdb", or "unresolved" when present'
+    );
+  });
 });
 
 describe("summarizeDryRunMatrix", () => {

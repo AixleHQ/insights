@@ -30,7 +30,11 @@ class ApplicationPolicy < ActionPolicy::Base
 
   def project_member?(project)
     return false unless user && project
-    project.members.exists?(id: user.id)
+    return false unless project.members.exists?(id: user.id)
+    # Orphaned project_memberships after leave must not grant access (AIX-611).
+    return true unless project.organization_project?
+
+    org_member?(project.organization)
   end
 
   def project_admin?(project)
@@ -44,14 +48,21 @@ class ApplicationPolicy < ActionPolicy::Base
     return true if project.organization_project? && org_owner?(project.organization)
 
     membership = project.project_memberships.find_by(user: user)
-    membership&.owner?
+    return false unless membership&.owner?
+    return true unless project.organization_project?
+
+    org_member?(project.organization)
   end
 
   def project_can_edit?(project)
     return false unless user && project
     return true if project.personal? && project.owner_id == user.id
     membership = project.project_memberships.find_by(user: user)
-    membership&.can_edit?
+    return false unless membership&.can_edit?
+    return true unless project.organization_project?
+
+    # Orphaned project_memberships after leave must not grant edit (AIX-611).
+    org_member?(project.organization)
   end
 
   def same_user?(target_user)

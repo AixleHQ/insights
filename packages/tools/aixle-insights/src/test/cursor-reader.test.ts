@@ -552,6 +552,7 @@ describe("cursor transcript sessions", () => {
             composerId: "composer-1",
             name: "Health check",
             workspacePath: "/tmp/workspace",
+            createdAt: null,
             lastUpdatedAt: "2026-05-20T09:00:00.000Z",
           },
         ],
@@ -589,6 +590,160 @@ describe("cursor transcript sessions", () => {
     expect(turns[0]?.promptText).toBe("First question");
     expect(turns[1]?.turnId).toBe("composer-multi:2");
     expect(turns[1]?.promptText).toBe("Second question");
+  });
+
+  // AIX-605: historical backfill must not collapse every turn onto session lastUpdatedAt.
+  it("uses per-message timestamps when present (multi-day turns keep distinct occurred_at)", async () => {
+    const filePath = join(tempDir, "composer-dated.jsonl");
+    writeFileSync(
+      filePath,
+      [
+        JSON.stringify({
+          role: "user",
+          timestamp: "2026-06-01T10:00:00.000Z",
+          message: { content: [{ type: "text", text: "<user_query>\nMonday prompt\n</user_query>" }] },
+        }),
+        JSON.stringify({
+          role: "assistant",
+          timestamp: "2026-06-01T10:01:00.000Z",
+          message: { content: [{ type: "text", text: "Monday answer." }] },
+        }),
+        JSON.stringify({
+          role: "user",
+          unixMs: Date.parse("2026-06-08T15:30:00.000Z"),
+          message: { content: [{ type: "text", text: "<user_query>\nNext week prompt\n</user_query>" }] },
+        }),
+        JSON.stringify({
+          role: "assistant",
+          message: {
+            createdAt: "2026-06-08T15:31:00.000Z",
+            content: [{ type: "text", text: "Next week answer." }],
+          },
+        }),
+      ].join("\n"),
+      "utf-8"
+    );
+
+    const turns = await parseCursorTranscriptFile(
+      filePath,
+      new Map([
+        [
+          "composer-dated",
+          {
+            composerId: "composer-dated",
+            name: "Dated session",
+            workspacePath: "/tmp/workspace",
+            createdAt: "2026-07-13T00:00:00.000Z",
+            lastUpdatedAt: "2026-07-19T23:59:59.000Z",
+          },
+        ],
+      ])
+    );
+
+    expect(turns).toHaveLength(2);
+    expect(turns[0]?.occurredAt).toBe("2026-06-01T10:00:00.000Z");
+    expect(turns[1]?.occurredAt).toBe("2026-06-08T15:30:00.000Z");
+    // Must not collapse onto the composer session window (the sync-week spike).
+    expect(turns[0]?.occurredAt).not.toBe("2026-07-19T23:59:59.000Z");
+    expect(turns[1]?.occurredAt).not.toBe("2026-07-19T23:59:59.000Z");
+  });
+
+  it("scales numeric epoch-seconds timestamps to ms (not misread as 1970)", async () => {
+    const filePath = join(tempDir, "composer-epoch-seconds.jsonl");
+    // 1720000000 s = 2024-07-03T09:46:40Z. If treated as ms it would be 1970.
+    writeFileSync(
+      filePath,
+      [
+        JSON.stringify({
+          role: "user",
+          timestamp: 1720000000,
+          message: { content: [{ type: "text", text: "<user_query>\nSeconds prompt\n</user_query>" }] },
+        }),
+        JSON.stringify({
+          role: "assistant",
+          message: { content: [{ type: "text", text: "Seconds answer." }] },
+        }),
+      ].join("\n"),
+      "utf-8"
+    );
+
+    const turns = await parseCursorTranscriptFile(filePath, new Map());
+
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.occurredAt).toBe("2024-07-03T09:46:40.000Z");
+  });
+
+  it("does not let a whitespace/wrapper-only line set a stale turn timestamp", async () => {
+    const filePath = join(tempDir, "composer-empty-line.jsonl");
+    // First user line is wrapper-only (strips to empty) with an early timestamp; the
+    // real prompt arrives later with its own timestamp. The empty line must be ignored
+    // so the turn takes the real prompt's time, not the stale one.
+    writeFileSync(
+      filePath,
+      [
+        JSON.stringify({
+          role: "user",
+          timestamp: "2026-06-01T08:00:00.000Z",
+          message: { content: [{ type: "text", text: "<user_query>\n   \n</user_query>" }] },
+        }),
+        JSON.stringify({
+          role: "user",
+          timestamp: "2026-06-01T10:00:00.000Z",
+          message: { content: [{ type: "text", text: "<user_query>\nReal prompt\n</user_query>" }] },
+        }),
+        JSON.stringify({
+          role: "assistant",
+          timestamp: "2026-06-01T10:01:00.000Z",
+          message: { content: [{ type: "text", text: "Answer." }] },
+        }),
+      ].join("\n"),
+      "utf-8"
+    );
+
+    const turns = await parseCursorTranscriptFile(filePath, new Map());
+
+    expect(turns).toHaveLength(1);
+    expect(turns[0]?.occurredAt).toBe("2026-06-01T10:00:00.000Z");
+    expect(turns[0]?.occurredAt).not.toBe("2026-06-01T08:00:00.000Z");
+  });
+
+  it("spreads turns across composer createdAt..lastUpdatedAt when JSONL has no per-message times", async () => {
+    const filePath = join(tempDir, "composer-spread.jsonl");
+    writeFileSync(
+      filePath,
+      [
+        JSON.stringify({ role: "user", message: { content: [{ type: "text", text: "<user_query>\nT1\n</user_query>" }] } }),
+        JSON.stringify({ role: "assistant", message: { content: [{ type: "text", text: "A1" }] } }),
+        JSON.stringify({ role: "user", message: { content: [{ type: "text", text: "<user_query>\nT2\n</user_query>" }] } }),
+        JSON.stringify({ role: "assistant", message: { content: [{ type: "text", text: "A2" }] } }),
+        JSON.stringify({ role: "user", message: { content: [{ type: "text", text: "<user_query>\nT3\n</user_query>" }] } }),
+        JSON.stringify({ role: "assistant", message: { content: [{ type: "text", text: "A3" }] } }),
+      ].join("\n"),
+      "utf-8"
+    );
+
+    const turns = await parseCursorTranscriptFile(
+      filePath,
+      new Map([
+        [
+          "composer-spread",
+          {
+            composerId: "composer-spread",
+            name: "Spread session",
+            workspacePath: "/tmp/workspace",
+            createdAt: "2026-06-01T00:00:00.000Z",
+            lastUpdatedAt: "2026-06-15T00:00:00.000Z",
+          },
+        ],
+      ])
+    );
+
+    expect(turns).toHaveLength(3);
+    expect(turns[0]?.occurredAt).toBe("2026-06-01T00:00:00.000Z");
+    expect(turns[1]?.occurredAt).toBe("2026-06-08T00:00:00.000Z");
+    expect(turns[2]?.occurredAt).toBe("2026-06-15T00:00:00.000Z");
+    const unique = new Set(turns.map((t) => t.occurredAt));
+    expect(unique.size).toBe(3);
   });
 
   it("reads transcript sessions using global composer headers metadata", async () => {

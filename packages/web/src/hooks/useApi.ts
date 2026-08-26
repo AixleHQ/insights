@@ -91,7 +91,8 @@ export const queryKeys = {
     stats: (id: string) => ["organizations", id, "stats"] as const,
   },
   members: {
-    all: (orgId: string) => ["organizations", orgId, "members"] as const,
+    all: (orgId: string, range?: string) =>
+      ["organizations", orgId, "members", range ?? "30d"] as const,
     detail: (orgId: string, id: string) => ["organizations", orgId, "members", id] as const,
     events: (orgId: string, id: string) => ["organizations", orgId, "members", id, "events"] as const,
     stats: (orgId: string, id: string, range?: string) =>
@@ -335,6 +336,9 @@ export function useLeaveOrganization() {
       queryClient.invalidateQueries({ queryKey: queryKeys.user.organizations });
       queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all });
       queryClient.invalidateQueries({ queryKey: queryKeys.projects.all(orgId) });
+      // Drop cached project detail pages so a bookmarked /projects/:id from the org the
+      // user just left re-fetches and gets a 404 instead of serving stale data (AIX-611).
+      queryClient.removeQueries({ queryKey: ["projects"] });
     },
   });
 }
@@ -491,13 +495,16 @@ export function useDeleteProjectSetting() {
 
 export function useOrganizationMembers(
   orgId: string,
-  options?: { enabled?: boolean }
+  options?: { enabled?: boolean; range?: MemberStatsRange }
 ) {
   const enabled = (options?.enabled ?? true) && !!orgId;
+  const range = options?.range ?? "30d";
   return useQuery({
-    queryKey: queryKeys.members.all(orgId),
+    queryKey: queryKeys.members.all(orgId, range),
     queryFn: async () => {
-      const response = await api.get<{ data: OrganizationMember[] }>(`/organizations/${orgId}/members`);
+      const response = await api.get<{ data: OrganizationMember[] }>(
+        `/organizations/${orgId}/members?${MEMBER_STATS_RANGE_PARAM[range]}`
+      );
       return response.data;
     },
     enabled,
@@ -700,6 +707,22 @@ export function useMemberStats(orgId: string, memberId: string, range: MemberSta
   });
 }
 
+export interface MemberDashboardToolRow {
+  tool_name: string;
+  event_count: number;
+  tokens_in: number;
+  tokens_out: number;
+  cost_usd: number;
+}
+
+export interface MemberDashboardModelRow {
+  model: string;
+  event_count: number;
+  tokens_in: number;
+  tokens_out: number;
+  cost_usd: number;
+}
+
 export interface MemberDashboardStats {
   total_events: number;
   total_cost_usd: number;
@@ -708,7 +731,8 @@ export interface MemberDashboardStats {
   events_change_percent: number;
   cost_change_percent: number;
   tokens_change_percent: number;
-  tool_breakdown: { tool_name: string; event_count: number; cost_usd: number }[];
+  tool_breakdown: MemberDashboardToolRow[];
+  model_breakdown: MemberDashboardModelRow[];
 }
 
 export interface MemberHeatmapEntry {
@@ -804,6 +828,12 @@ export function useProject(id: string, options?: { refetchInterval?: number | fa
       return response.data;
     },
     enabled: !!id,
+    // Access can be revoked instantly (leave/remove org). Never trust a fresh cache
+    // window here — always revalidate on mount/focus so a former member gets 404
+    // instead of a stale project detail (AIX-611).
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
     refetchInterval: options?.refetchInterval,
   });
 }

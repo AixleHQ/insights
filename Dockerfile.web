@@ -12,8 +12,8 @@ ENV NODE_ENV="production"
 # Build stage
 FROM base AS build
 
-COPY packages/web/package.json packages/web/package-lock.json ./
-RUN npm ci --include=dev
+COPY packages/web/package.json packages/web/package-lock.json packages/web/.npmrc ./
+RUN npm ci --include=dev --ignore-scripts
 
 COPY packages/web/ .
 
@@ -22,8 +22,8 @@ RUN npm run build
 # CI stage: full Node environment with dev dependencies for tests and linters
 FROM base AS ci
 ENV NODE_ENV="test"
-COPY packages/web/package.json packages/web/package-lock.json ./
-RUN npm ci --include=dev
+COPY packages/web/package.json packages/web/package-lock.json packages/web/.npmrc ./
+RUN npm ci --include=dev --ignore-scripts
 COPY packages/web/ .
 CMD ["npm", "run", "test:run"]
 
@@ -103,6 +103,10 @@ ENV KEYCLOAK_REALM="db90"
 ENV KEYCLOAK_CLIENT_ID="db90-web"
 ENV ROLLBAR_CLIENT_TOKEN=""
 ENV SHOW_PROMPT_INSIGHTS_SECTION_IN_PERSONAL_DASHBOARD="false"
+# Must be set per deployment target (staging/production). If unset, Rollbar
+# silently mislabels the environment as "production" (falls back to the
+# Vite build mode) instead of failing loudly like the other vars above.
+ENV APP_ENV=""
 
 COPY <<'ENTRYPOINT' /docker-entrypoint.d/90-runtime-config.sh
 #!/bin/sh
@@ -112,7 +116,8 @@ window.__APP_CONFIG__ = {
   keycloakRealm: "${KEYCLOAK_REALM}",
   keycloakClientId: "${KEYCLOAK_CLIENT_ID}",
   rollbarClientToken: "${ROLLBAR_CLIENT_TOKEN}",
-  showPromptInsightsSectionInPersonalDashboard: "${SHOW_PROMPT_INSIGHTS_SECTION_IN_PERSONAL_DASHBOARD}"
+  showPromptInsightsSectionInPersonalDashboard: "${SHOW_PROMPT_INSIGHTS_SECTION_IN_PERSONAL_DASHBOARD}",
+  appEnv: "${APP_ENV}"
 };
 EOF
 ENTRYPOINT

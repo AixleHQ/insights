@@ -5,7 +5,7 @@ import { config } from "./config";
 export const rollbarConfig: Rollbar.Configuration = {
   accessToken: config.rollbarClientToken,
   enabled: !!config.rollbarClientToken,
-  environment: import.meta.env.MODE,
+  environment: config.appEnv,
   captureUncaught: true,
   captureUnhandledRejections: true,
 };

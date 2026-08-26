@@ -4,6 +4,7 @@ module Admin
   class ApplicationController < Administrate::ApplicationController
     include ActionController::Cookies
     include ActionController::RequestForgeryProtection
+    include AdminContentSecurityPolicy
 
     layout "admin/application"
 

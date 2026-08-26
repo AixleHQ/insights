@@ -14,6 +14,7 @@ import { buildHealthSnapshot, formatHealthForCli } from "./health.js";
 import { installClaudeUserMcp, type InstallClaudeUserMcpOptions, type InstallResult } from "./install/claude.js";
 import { installHooksConfig, uninstallHooksConfig, verifyHooksConfig, FORWARDER_FILENAME } from "./hooks/hooks-config.js";
 import { evaluateTransportSecurity } from "./lib/transport-security.js";
+import { readEnvWithDeprecatedAlias, warnDeprecatedEnvVar } from "./lib/env.js";
 import { join } from "node:path";
 import { fileURLToPath as nodeFileURLToPath } from "node:url";
 import { mcpLog } from "./log.js";
@@ -226,17 +227,19 @@ Options:
   --help, -h  Show this help message.
 
 init options:
-  --host <url>             Aixle Insights API base URL (default: env DB90_API_URL or http://localhost:3000)
-  --keycloak-url <issuer>  Keycloak realm issuer (default: env KEYCLOAK_ISSUER / DB90_KEYCLOAK_ISSUER)
+  --host <url>             Aixle Insights API base URL (default: env AIXLE_INSIGHTS_API_URL, or deprecated DB90_API_URL, or http://localhost:3000)
+  --keycloak-url <issuer>  Keycloak realm issuer (default: env KEYCLOAK_ISSUER, or AIXLE_INSIGHTS_KEYCLOAK_ISSUER / deprecated DB90_KEYCLOAK_ISSUER)
   --tool-name <name>       Optional: mint only \`claude_code\`, only \`cursor\`, or omit to mint BOTH.
-  --organization-id <uuid> Optional: scope MCP token exchange to this org (overrides env DB90_ORGANIZATION_ID).
+  --organization-id <uuid> Optional: scope MCP token exchange to this org (overrides env AIXLE_INSIGHTS_ORGANIZATION_ID / deprecated DB90_ORGANIZATION_ID).
   --force                  Replace an existing user "aixle-insights" MCP entry in ~/.claude.json if it differs.
   --hooks                  (opt-in) Install Cursor hook forwarder for per-turn model attribution.
                            Requires Cursor restart. Run 'aixle-insights uninstall-hooks' to remove.
   --insecure               Allow remote http:// hosts for trusted non-production test endpoints only.
 
 Multi-org:
-  Set \`DB90_ORGANIZATION_ID\` to a UUID, or pass \`--organization-id\` on \`init\`, so ingest tokens are minted for that membership instead of the default (oldest) org.
+  If you belong to more than one org, pass \`--organization-id <uuid>\` (or set \`AIXLE_INSIGHTS_ORGANIZATION_ID\`, or deprecated \`DB90_ORGANIZATION_ID\`),
+  or set a Default Organization in web Preferences. Without either, \`init\` lists your orgs and exits.
+  Single-org users need no flag. Run \`aixle-insights health\` to see the bound organization_id.
 
 Credentials:
   Stored in the OS keychain via keytar when available; otherwise
@@ -247,7 +250,11 @@ Note: Omitting --tool-name provisions separate ingest tokens for Claude Code + C
 }
 
 function defaultDb90Host(): string {
-  const v = process.env["DB90_API_URL"]?.trim();
+  const v = readEnvWithDeprecatedAlias({
+    current: "AIXLE_INSIGHTS_API_URL",
+    deprecated: "DB90_API_URL",
+    onDeprecatedUse: warnDeprecatedEnvVar,
+  });
   if (v) return v.replace(/\/$/, "");
   return "http://localhost:3000";
 }
@@ -286,10 +293,10 @@ export async function runInit(cliArgs: Args, deps?: Partial<InitDeps>): Promise<
     runtime.error(`Warning: ${transportSecurity.warning}`);
   }
 
-  const kcIssuer = (cliArgs.keycloakUrl ?? runtime.defaultKeycloakIssuer()).trim();
+  const kcIssuer = (cliArgs.keycloakUrl ?? runtime.defaultKeycloakIssuer(db90Host)).trim();
   if (!kcIssuer) {
     runtime.error(
-      "Error: Keycloak issuer is not configured. Pass --keycloak-url or set KEYCLOAK_ISSUER / DB90_KEYCLOAK_ISSUER."
+      "Error: Keycloak issuer is not configured. Pass --keycloak-url or set KEYCLOAK_ISSUER / AIXLE_INSIGHTS_KEYCLOAK_ISSUER."
     );
     return 1;
   }
@@ -305,11 +312,15 @@ export async function runInit(cliArgs: Args, deps?: Partial<InitDeps>): Promise<
         : ["claude_code", "cursor"];
 
   const fromFlag = cliArgs.organizationId?.trim();
-  const fromEnv = process.env["DB90_ORGANIZATION_ID"]?.trim();
+  const fromEnv = readEnvWithDeprecatedAlias({
+    current: "AIXLE_INSIGHTS_ORGANIZATION_ID",
+    deprecated: "DB90_ORGANIZATION_ID",
+    onDeprecatedUse: warnDeprecatedEnvVar,
+  });
   const exchangeOrganizationId = fromFlag || fromEnv;
   if (exchangeOrganizationId && !isValidDb90OrganizationUuid(exchangeOrganizationId)) {
     runtime.error(
-      "Error: --organization-id / DB90_ORGANIZATION_ID must be a valid UUID (RFC 4122, version 1–5, variant per Aixle Insights API)."
+      "Error: --organization-id / AIXLE_INSIGHTS_ORGANIZATION_ID must be a valid UUID (RFC 4122, version 1–5, variant per Aixle Insights API)."
     );
     return 1;
   }
@@ -337,6 +348,19 @@ export async function runInit(cliArgs: Args, deps?: Partial<InitDeps>): Promise<
   });
 
   if (!result.ok) {
+    if (result.code === "organization_selection_required") {
+      runtime.error(result.error);
+      if (result.organizations?.length) {
+        runtime.error("Multiple organizations found — choose one to bind this install:");
+        for (const o of result.organizations) {
+          runtime.error(`  - ${o.name} (${o.id})${o.role ? ` — ${o.role}` : ""}`);
+        }
+      }
+      runtime.error("Then either:");
+      runtime.error("  1. Re-run init with --organization-id <uuid> (completes device login again), or");
+      runtime.error("  2. Set a Default Organization in web Preferences, then re-run init.");
+      return 1;
+    }
     runtime.error(`Auth failed: ${result.error}`);
     return 1;
   }
@@ -429,7 +453,14 @@ export async function runOnce(
   let projectId: string | null = null;
   let projectIdSource: Awaited<ReturnType<typeof runtime.resolveProjectId>>["source"] = "none";
   if (lookupToken) {
-    const resolution = await runtime.resolveProjectId(undefined, undefined, creds.host, lookupToken, false);
+    const resolution = await runtime.resolveProjectId(
+      undefined,
+      undefined,
+      creds.host,
+      lookupToken,
+      false,
+      creds.insecureHttpAllowed === true
+    );
     projectId = resolution.projectId;
     projectIdSource = resolution.source;
     mcpLog.info(

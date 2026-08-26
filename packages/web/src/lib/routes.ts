@@ -12,6 +12,8 @@
 export const AppRoutes = {
   // Auth & public
   login: "/login",
+  loginEmail: "/login/email",
+  signup: "/signup",
   authCallback: "/auth/callback",
   authSilentCallback: "/auth/silent-callback",
   authIframeCallback: "/auth/iframe-callback",

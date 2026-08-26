@@ -1,16 +1,39 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtempSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { tmpdir, homedir } from "node:os";
 import {
   installClaudeUserMcp,
   desiredAixleInsightsEntry,
   aixleInsightsEntryMatchesDesired,
+  defaultClaudeUserConfigPath,
 } from "../install/claude.js";
 
 function tempDir(): string {
   return mkdtempSync(join(tmpdir(), "aixle-insights-install-"));
 }
+
+describe("defaultClaudeUserConfigPath", () => {
+  afterEach(() => {
+    delete process.env.AIXLE_INSIGHTS_CLAUDE_USER_CONFIG_PATH;
+    delete process.env.DB90_CLAUDE_USER_CONFIG_PATH;
+  });
+
+  it("defaults to ~/.claude.json when no override env var is set", () => {
+    expect(defaultClaudeUserConfigPath()).toBe(join(homedir(), ".claude.json"));
+  });
+
+  it("prefers AIXLE_INSIGHTS_CLAUDE_USER_CONFIG_PATH over the deprecated DB90_CLAUDE_USER_CONFIG_PATH", () => {
+    process.env.AIXLE_INSIGHTS_CLAUDE_USER_CONFIG_PATH = "/tmp/current.json";
+    process.env.DB90_CLAUDE_USER_CONFIG_PATH = "/tmp/deprecated.json";
+    expect(defaultClaudeUserConfigPath()).toBe("/tmp/current.json");
+  });
+
+  it("falls back to the deprecated DB90_CLAUDE_USER_CONFIG_PATH when the current name is unset", () => {
+    process.env.DB90_CLAUDE_USER_CONFIG_PATH = "/tmp/deprecated.json";
+    expect(defaultClaudeUserConfigPath()).toBe("/tmp/deprecated.json");
+  });
+});
 
 describe("installClaudeUserMcp", () => {
   let dir: string;

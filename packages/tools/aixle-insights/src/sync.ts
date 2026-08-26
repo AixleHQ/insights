@@ -37,6 +37,10 @@ import {
   lookupProjectByRemote,
   type ProjectResolution,
 } from "./lib/index.js";
+import {
+  isRepoPathWithinRoot,
+  normalizeRepoPathCandidate,
+} from "./lib/repo-path-safety.js";
 import type { CursorDb90Payload } from "./readers/cursor.js";
 import { mcpLog } from "./log.js";
 
@@ -75,6 +79,8 @@ export interface SyncOptions {
   verbose: boolean;
   projectId: string | null;
   projectIdSource?: ProjectResolution["source"];
+  /** Mirrors StoredCredentials.insecureHttpAllowed — set when `init --insecure` was used for this host. */
+  allowInsecureHttp?: boolean;
   pricing: PricingTable;
   appDir?: string;
   transcriptBaseDirs?: string[];
@@ -232,10 +238,11 @@ async function resolveProjectIdForRepoPathCached(
   host: string,
   token: string,
   verbose: boolean,
-  cache: Map<string, string | null>
+  cache: Map<string, string | null>,
+  allowInsecureHttp = false
 ): Promise<string | null> {
-  const normalized = repoPath?.trim();
-  if (!normalized) return null;
+  const normalized = normalizeRepoPathCandidate(repoPath);
+  if (normalized === null) return null;
   if (cache.has(normalized)) return cache.get(normalized) ?? null;
 
   const canonicalRemote = getGitRemoteForPath(normalized, verbose);
@@ -244,29 +251,36 @@ async function resolveProjectIdForRepoPathCached(
     return null;
   }
 
-  const result = await lookupProjectByRemote(canonicalRemote, host, token, verbose);
+  const result = await lookupProjectByRemote(canonicalRemote, host, token, verbose, allowInsecureHttp);
   const projectId = result && typeof result === "object" && "project_id" in result ? result.project_id : null;
   cache.set(normalized, projectId);
   return projectId;
 }
 
+/**
+ * The repo path for a Cursor payload, normalized and safe to hand to project
+ * resolution. Returns an absolute, `..`-collapsed path or undefined.
+ *
+ * `workspace_folder` comes from the workspace's own `workspace.json` and
+ * `workspace` from a composer `uri.fsPath` or the `state.vscdb` path — all
+ * untrusted. When the preferred field is unusable we fall through to the other
+ * rather than giving up. See AIX-547.
+ */
 export function cursorRepoPathFromPayload(payload: CursorDb90Payload): string | undefined {
   const metadata = payload.metadata as Record<string, unknown> | undefined;
   if (!metadata) return undefined;
 
-  if (typeof metadata.workspace_folder === "string" && metadata.workspace_folder.length > 0) {
-    return metadata.workspace_folder;
-  }
-
-  if (typeof metadata.workspace === "string" && metadata.workspace.length > 0) {
-    return metadata.workspace;
+  for (const candidate of [metadata.workspace_folder, metadata.workspace]) {
+    if (typeof candidate !== "string") continue;
+    const normalized = normalizeRepoPathCandidate(candidate);
+    if (normalized !== null) return normalized;
   }
 
   return undefined;
 }
 
 async function runClaudeSlice(options: SyncOptions): Promise<SyncResult> {
-  const { token, host, dryRun, verbose, projectId, pricing } = options;
+  const { token, host, dryRun, verbose, projectId, pricing, allowInsecureHttp = false } = options;
   const appDir = options.appDir ?? getAppDir();
   const backoffKey = credentialStateKey(host, token);
   const errors: string[] = [];
@@ -342,14 +356,16 @@ async function runClaudeSlice(options: SyncOptions): Promise<SyncResult> {
       continue;
     }
 
-    // When scopeDir is set, skip turns from other directories.
+    // When scopeDir is set, skip turns from other directories. `turn.cwd` is an
+    // arbitrary string from a transcript JSONL, so a plain prefix match would
+    // accept `<scopeDir>/../../elsewhere` (AIX-547).
     if (scopeDir) {
-      const cwd = turn.cwd?.trim();
-      const inScope = cwd && (cwd === scopeDir || cwd.startsWith(scopeDir + "/"));
+      const cwd = normalizeRepoPathCandidate(turn.cwd);
+      const inScope = cwd !== null && isRepoPathWithinRoot(cwd, scopeDir);
       if (!inScope) {
         totalSkipped++;
         if (verbose) {
-          console.log(`[verbose] Skipping Claude turn ${turn.turnId} — cwd=${cwd ?? "(none)"} not under scopeDir=${scopeDir}`);
+          console.log(`[verbose] Skipping Claude turn ${turn.turnId} — cwd=${turn.cwd ?? "(none)"} not under scopeDir=${scopeDir}`);
         }
         continue;
       }
@@ -358,7 +374,11 @@ async function runClaudeSlice(options: SyncOptions): Promise<SyncResult> {
     const sKey = sessionStateKey(turn.turnId);
     const known = state.sessions[sKey];
 
-    if (known) {
+    // A turn keeps its turnId as Claude appends more tool_use blocks to it, so a
+    // plain "already known → skip" would drop derivatives appended after an earlier
+    // mid-turn sync. Skip only when the content fingerprint is unchanged; otherwise
+    // re-emit so the newly appended tool uses are sent (AIX-259).
+    if (known && known.contentHash && known.contentHash === turn.contentHash) {
       totalSkipped++;
       if (verbose) {
         console.log(`[verbose] Skipping already-synced Claude turn ${turn.turnId}`);
@@ -377,14 +397,16 @@ async function runClaudeSlice(options: SyncOptions): Promise<SyncResult> {
     // effectively one network call per unique cwd per sync.
     const resolvedProjectId = scopeDir
       ? (projectId ??
-         (await resolveProjectIdForRepoPathCached(turn.cwd, host, token, verbose, projectLookupCache)) ??
+         (await resolveProjectIdForRepoPathCached(turn.cwd, host, token, verbose, projectLookupCache, allowInsecureHttp)) ??
          undefined)
       : (explicitProject ??
-         (await resolveProjectIdForRepoPathCached(turn.cwd, host, token, verbose, projectLookupCache)) ??
+         (await resolveProjectIdForRepoPathCached(turn.cwd, host, token, verbose, projectLookupCache, allowInsecureHttp)) ??
          undefined);
-    const payload = mapClaudeTranscriptTurn(turn, { projectId: resolvedProjectId, pricing });
+    const payloads = mapClaudeTranscriptTurn(turn, { projectId: resolvedProjectId, pricing });
+    if (!payloads?.length) continue;
+    const parentPayload = payloads[0];
 
-    if (verbose && payload.cost_usd === null) {
+    if (verbose && parentPayload?.cost_usd === null) {
       if (!turn.model) {
         if (turn.tokensIn > 0 || turn.tokensOut > 0) {
           console.warn(`[warn] Claude turn ${turn.turnId} has usage but no model — cost_usd will be null`);
@@ -396,50 +418,64 @@ async function runClaudeSlice(options: SyncOptions): Promise<SyncResult> {
     }
 
     if (dryRun) {
-      console.log(`[dry-run] Would send Claude turn ${turn.turnId}:`);
-      console.log(JSON.stringify(payload, null, 2));
-      totalSent++;
+      for (const payload of payloads) {
+        console.log(
+          `[dry-run] Would send Claude ${payload.event_type} ${payload.metadata.session_id}:`
+        );
+        console.log(JSON.stringify(payload, null, 2));
+      }
+      totalSent += payloads.length;
       continue;
     }
 
-    if (verbose) {
-      console.log(`[verbose] Sending Claude turn ${turn.turnId} (${turn.tokensIn + turn.tokensOut} tokens)`);
-    }
-
-    const ok = await postEvent(payload, host, token, {
-      on429: (retryAfter, quotaExceeded) => {
-        const currentBackoff = backoffUntilByCredential.get(backoffKey);
-        const nextBackoff = new Date(Math.max(currentBackoff?.getTime() ?? 0, Date.now() + retryAfter * 1000));
-        backoffUntilByCredential.set(backoffKey, nextBackoff);
-        shouldStopForBackoff = true;
-        const reason = quotaExceeded ? "Monthly quota exceeded" : "Rate limited";
-        mcpLog.warn(
-          "sync_rate_limit_pause",
-          {
-            tool: "claude_code",
-            retry_until: nextBackoff.toISOString(),
-            quota_exceeded: quotaExceeded,
-          },
-          true
+    let allOk = true;
+    for (const payload of payloads) {
+      if (verbose) {
+        console.log(
+          `[verbose] Sending Claude ${payload.event_type} ${payload.metadata.session_id}`
         );
-        console.warn(`[aixle-insights] ${reason}. Pausing until ${nextBackoff.toISOString()}.`);
-        // Persist backoff to state so it survives process restarts
-        state = { ...state, rate_limited_until: nextBackoff.toISOString() };
-        writeState(state, appDir, host, token);
-      },
-    });
-    if (ok) {
-      state = markSessionSent(state, sKey, turn.fileSize);
-      writeState(state, appDir, host, token);
-      totalSent++;
-    } else {
-      totalFailed++;
-      errors.push(`Failed to post Claude turn ${turn.turnId}`);
-      mcpLog.error("sync_ingest_final_failure", { tool: "claude_code", session_id: turn.turnId }, true);
-      if (shouldStopForBackoff) {
+      }
+
+      const ok = await postEvent(payload, host, token, {
+        allowInsecureHttp,
+        on429: (retryAfter, quotaExceeded) => {
+          const currentBackoff = backoffUntilByCredential.get(backoffKey);
+          const nextBackoff = new Date(Math.max(currentBackoff?.getTime() ?? 0, Date.now() + retryAfter * 1000));
+          backoffUntilByCredential.set(backoffKey, nextBackoff);
+          shouldStopForBackoff = true;
+          const reason = quotaExceeded ? "Monthly quota exceeded" : "Rate limited";
+          mcpLog.warn(
+            "sync_rate_limit_pause",
+            {
+              tool: "claude_code",
+              retry_until: nextBackoff.toISOString(),
+              quota_exceeded: quotaExceeded,
+            },
+            true
+          );
+          console.warn(`[aixle-insights] ${reason}. Pausing until ${nextBackoff.toISOString()}.`);
+          // Persist backoff to state so it survives process restarts
+          state = { ...state, rate_limited_until: nextBackoff.toISOString() };
+          writeState(state, appDir, host, token);
+        },
+      });
+      if (!ok) {
+        allOk = false;
+        totalFailed++;
+        errors.push(`Failed to post Claude ${payload.event_type} for turn ${turn.turnId}`);
+        mcpLog.error("sync_ingest_final_failure", { tool: "claude_code", session_id: turn.turnId }, true);
         break;
       }
     }
+
+    if (allOk) {
+      totalSent += payloads.length;
+      state = markSessionSent(state, sKey, turn.fileSize, turn.contentHash);
+      writeState(state, appDir, host, token);
+    } else if (shouldStopForBackoff) {
+      break;
+    }
+    // Non-backoff failure: continue to next turn (failed turn will retry next sync)
   }
 
   const result: SyncResult = { sent: totalSent, failed: totalFailed, skipped: totalSkipped };
@@ -457,6 +493,7 @@ async function runCursorSlice(params: {
   projectId: string | null;
   projectIdSource?: ProjectResolution["source"];
   projectLookupToken?: string | null;
+  allowInsecureHttp?: boolean;
   appDir: string;
   cursorBaseDir?: string;
   cursorTranscriptProjectDirs?: string[];
@@ -472,6 +509,7 @@ async function runCursorSlice(params: {
     projectId,
     projectIdSource,
     projectLookupToken,
+    allowInsecureHttp = false,
     appDir,
     cursorBaseDir,
     cursorTranscriptProjectDirs,
@@ -522,6 +560,7 @@ async function runCursorSlice(params: {
       host,
       token,
       projectLookupToken: lookupToken,
+      allowInsecureHttp,
       verbose,
       cursorBaseDir,
       cursorTranscriptProjectDirs,
@@ -533,12 +572,12 @@ async function runCursorSlice(params: {
       const inScope: CursorDb90Payload[] = [];
       for (const payload of group.payloads) {
         const ws = cursorRepoPathFromPayload(payload);
-        if (ws && (ws === scopeDir || ws.startsWith(scopeDir + "/"))) {
+        if (ws && isRepoPathWithinRoot(ws, scopeDir)) {
           // Same fallback as Claude: when the pre-resolved projectId is null, do a
           // per-payload lookup from the payload's workspace. Cache dedupes by path.
           const resolved =
             projectId ??
-            (await resolveProjectIdForRepoPathCached(ws, host, lookupToken, verbose, projectLookupCache));
+            (await resolveProjectIdForRepoPathCached(ws, host, lookupToken, verbose, projectLookupCache, allowInsecureHttp));
           if (resolved) payload.project_id = resolved;
           else delete payload.project_id;
           inScope.push(payload);
@@ -560,7 +599,8 @@ async function runCursorSlice(params: {
           host,
           lookupToken,
           verbose,
-          projectLookupCache
+          projectLookupCache,
+          allowInsecureHttp
         );
         if (resolvedProjectId) payload.project_id = resolvedProjectId;
         else delete payload.project_id;
@@ -652,7 +692,7 @@ async function runCursorSlice(params: {
           continue;
         }
 
-        const ok = await postEvent(payload, host, token, { on429 });
+        const ok = await postEvent(payload, host, token, { on429, allowInsecureHttp });
         if (ok) {
           totalSent++;
           const turnId = payload.metadata.session_id;
@@ -681,7 +721,7 @@ async function runCursorSlice(params: {
       continue;
     }
 
-    const batchResult = await postEvents(group.payloads, host, token, { on429 });
+    const batchResult = await postEvents(group.payloads, host, token, { on429, allowInsecureHttp });
     totalSent += batchResult.sent;
     totalFailed += batchResult.failed;
 
@@ -742,11 +782,12 @@ async function runCursorSlice(params: {
         state: stateMut,
         host,
         token,
+        allowInsecureHttp,
         on429,
         resolveProjectId: explicitProject
           ? undefined
           : (workspace) =>
-              resolveProjectIdForRepoPathCached(workspace, host, lookupToken, verbose, projectLookupCache),
+              resolveProjectIdForRepoPathCached(workspace, host, lookupToken, verbose, projectLookupCache, allowInsecureHttp),
         verbose,
       });
       totalSent += hooksResult.sent;
@@ -849,6 +890,7 @@ export async function syncTelemetryTools(options: MultiSyncOptions): Promise<Syn
           dryRun,
           verbose,
           projectId,
+          allowInsecureHttp: credentials.insecureHttpAllowed === true,
           pricing,
           appDir,
           transcriptBaseDirs: options.transcriptBaseDirs,
@@ -867,6 +909,7 @@ export async function syncTelemetryTools(options: MultiSyncOptions): Promise<Syn
           projectId,
           projectIdSource,
           projectLookupToken,
+          allowInsecureHttp: credentials.insecureHttpAllowed === true,
           appDir,
           cursorBaseDir: options.cursorBaseDir,
           cursorTranscriptProjectDirs: options.cursorTranscriptProjectDirs,

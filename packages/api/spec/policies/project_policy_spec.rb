@@ -29,8 +29,8 @@ RSpec.describe ProjectPolicy, type: :policy do
         expect(policy(personal_project, current_user: other_user).apply(:show?)).to be false
       end
 
-      it 'allows global admins' do
-        expect(policy(personal_project, current_user: global_admin).apply(:show?)).to be true
+      it 'denies global admins who do not own the personal project' do
+        expect(policy(personal_project, current_user: global_admin).apply(:show?)).to be false
       end
     end
 
@@ -73,6 +73,19 @@ RSpec.describe ProjectPolicy, type: :policy do
         create(:organization_membership, user: bare_member, organization: organization, role: 'member')
 
         expect(policy(org_project, current_user: bare_member).apply(:show?)).to be false
+      end
+
+      it 'denies a global admin with no org/project membership (AIX-611)' do
+        expect(policy(org_project, current_user: global_admin).apply(:show?)).to be false
+      end
+
+      it 'denies show? when only an orphaned project_membership remains (AIX-611)' do
+        former = create(:user)
+        org_membership = create(:organization_membership, user: former, organization: organization, role: 'member')
+        create(:project_membership, user: former, project: org_project, role: 'member')
+        org_membership.delete
+
+        expect(policy(org_project, current_user: former).apply(:show?)).to be false
       end
 
       it 'allows an org owner without a project membership row (implicit owner)' do
@@ -122,8 +135,8 @@ RSpec.describe ProjectPolicy, type: :policy do
         expect(policy(org_project, current_user: org_member).apply(:destroy?)).to be false
       end
 
-      it 'allows global admins' do
-        expect(policy(org_project, current_user: global_admin).apply(:destroy?)).to be true
+      it 'denies global admins without org/project ownership (AIX-611)' do
+        expect(policy(org_project, current_user: global_admin).apply(:destroy?)).to be false
       end
     end
   end
@@ -188,9 +201,33 @@ RSpec.describe ProjectPolicy, type: :policy do
       expect(result).to include(personal)
     end
 
-    it 'global admins see all projects' do
+    it 'excludes org projects once the user is no longer an org member (AIX-611)' do
+      former_member = create(:user)
+      org_membership = create(:organization_membership, user: former_member, organization: organization, role: 'member')
+      create(:project_membership, user: former_member, project: assigned_project, role: 'member')
+      # Simulate an orphaned project_membership left behind by a bypass removal path:
+      # delete only the org membership, leaving the project_membership row in place.
+      org_membership.delete
+
+      p = policy(assigned_project, current_user: former_member)
+      result = p.apply_scope(Project.all, type: :active_record_relation)
+      expect(result).not_to include(assigned_project)
+    end
+
+    it 'excludes org projects for a global admin who left the org (AIX-611)' do
+      admin = create(:user, :global_admin)
+      org_membership = create(:organization_membership, user: admin, organization: organization, role: 'member')
+      create(:project_membership, user: admin, project: assigned_project, role: 'member')
+      org_membership.destroy!
+
+      result = scope_for(admin)
+      expect(result).not_to include(assigned_project, unassigned_project)
+      expect(policy(assigned_project, current_user: admin).apply(:show?)).to be false
+    end
+
+    it 'global admins only see projects via the same membership rules as everyone else' do
       result = scope_for(global_admin)
-      expect(result).to include(assigned_project, unassigned_project)
+      expect(result).not_to include(assigned_project, unassigned_project)
     end
   end
 end

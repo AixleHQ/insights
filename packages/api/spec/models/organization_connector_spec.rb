@@ -234,12 +234,34 @@ RSpec.describe OrganizationConnector, type: :model do
     end
   end
 
+  describe '#mark_connected!' do
+    it 'restores connected status without refreshing last_sync_at' do
+      connector = create(:organization_connector, status: 'testing', last_error: 'previous')
+      connector.update_columns(last_sync_at: 10.hours.ago, testing_started_at: 5.minutes.ago)
+      prior_sync = connector.last_sync_at
+
+      connector.mark_connected!
+
+      expect(connector.status).to eq('connected')
+      expect(connector.last_error).to be_nil
+      expect(connector.testing_started_at).to be_nil
+      expect(connector.is_active).to be(true)
+      expect(connector.last_sync_at).to eq(prior_sync)
+    end
+  end
+
   describe '#mark_testing!' do
     it 'sets status to testing and clears last_error' do
       connector = create(:organization_connector, status: 'error', last_error: 'previous error')
       connector.mark_testing!
       expect(connector.status).to eq('testing')
       expect(connector.last_error).to be_nil
+    end
+
+    it 'stamps testing_started_at' do
+      connector = create(:organization_connector)
+      connector.mark_testing!
+      expect(connector.testing_started_at).to be_within(1.second).of(Time.current)
     end
   end
 
@@ -248,6 +270,105 @@ RSpec.describe OrganizationConnector, type: :model do
       connector = create(:organization_connector)
       connector.mark_error!('Something went wrong')
       expect(connector.last_error).to eq('Something went wrong')
+    end
+
+    it 'clears testing_started_at' do
+      connector = create(:organization_connector, status: 'testing')
+      connector.update_columns(testing_started_at: 1.hour.ago)
+      connector.mark_error!('boom')
+      expect(connector.testing_started_at).to be_nil
+    end
+  end
+
+  describe '#mark_disconnected!' do
+    it 'clears testing_started_at' do
+      connector = create(:organization_connector, status: 'testing')
+      connector.update_columns(testing_started_at: 1.hour.ago)
+      connector.mark_disconnected!
+      expect(connector.testing_started_at).to be_nil
+    end
+  end
+
+  describe '#stale?' do
+    it 'is true for a connected AI connector past its interval' do
+      connector = create(:organization_connector, connector_type: 'anthropic', status: 'connected')
+      connector.update_columns(last_sync_at: 10.hours.ago)
+      expect(connector.stale?).to be(true)
+    end
+
+    it 'is false just inside the interval boundary' do
+      connector = create(:organization_connector, connector_type: 'anthropic', status: 'connected')
+      connector.update_columns(last_sync_at: (8.hours - 1.minute).ago)
+      expect(connector.stale?).to be(false)
+    end
+
+    it 'is true when last_sync_at is null' do
+      connector = create(:organization_connector, connector_type: 'anthropic', status: 'connected')
+      connector.update_columns(last_sync_at: nil)
+      expect(connector.stale?).to be(true)
+    end
+
+    it 'is false for event-driven types with no interval' do
+      connector = create(:organization_connector, connector_type: 'github', status: 'connected')
+      connector.update_columns(last_sync_at: 30.days.ago)
+      expect(connector.stale?).to be(false)
+    end
+
+    it 'is false for a webhook-active connector regardless of last_sync_at' do
+      connector = create(:organization_connector, connector_type: 'openrouter', status: 'connected',
+                         webhook_active: true)
+      connector.update_columns(last_sync_at: 10.hours.ago)
+      expect(connector.stale?).to be(false)
+    end
+
+    it 'is false when the connector is not connected' do
+      connector = create(:organization_connector, connector_type: 'anthropic', status: 'error')
+      connector.update_columns(last_sync_at: 10.hours.ago)
+      expect(connector.stale?).to be(false)
+    end
+  end
+
+  describe '#stuck?' do
+    it 'is true when testing longer than the timeout' do
+      connector = create(:organization_connector, status: 'testing')
+      connector.update_columns(testing_started_at: 2.hours.ago)
+      expect(connector.stuck?).to be(true)
+    end
+
+    it 'is false just inside the timeout boundary' do
+      connector = create(:organization_connector, status: 'testing')
+      connector.update_columns(testing_started_at: (1.hour - 1.minute).ago)
+      expect(connector.stuck?).to be(false)
+    end
+
+    it 'falls back to updated_at when testing_started_at is null' do
+      connector = create(:organization_connector, status: 'testing')
+      connector.update_columns(testing_started_at: nil, updated_at: 2.hours.ago)
+      expect(connector.stuck?).to be(true)
+    end
+
+    it 'is false when not in testing' do
+      connector = create(:organization_connector, status: 'connected')
+      expect(connector.stuck?).to be(false)
+    end
+  end
+
+  describe '#healthy?' do
+    it 'is true for a freshly synced connected connector' do
+      connector = create(:organization_connector, connector_type: 'anthropic', status: 'connected')
+      connector.update_columns(last_sync_at: 5.minutes.ago)
+      expect(connector.healthy?).to be(true)
+    end
+
+    it 'is false for a stale connector' do
+      connector = create(:organization_connector, connector_type: 'anthropic', status: 'connected')
+      connector.update_columns(last_sync_at: 10.hours.ago)
+      expect(connector.healthy?).to be(false)
+    end
+
+    it 'is false for a non-connected connector' do
+      connector = create(:organization_connector, status: 'testing')
+      expect(connector.healthy?).to be(false)
     end
   end
 end

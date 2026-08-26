@@ -82,6 +82,17 @@ RSpec.describe ToolEvents::AutoMembershipService do
       end
     end
 
+    context "when a former member's events arrive after they left the org (AIX-611)" do
+      it "does not resurrect a project membership" do
+        # user's org membership (from the outer before block) is removed, as if they left.
+        OrganizationMembership.where(user: user, organization: organization).delete_all
+
+        tool_event = build(:tool_event, user: user, project: project, organization: organization)
+        expect { described_class.call(tool_event) }.not_to change(ProjectMembership, :count)
+        expect(ProjectMembership.exists?(user: user, project: project)).to be false
+      end
+    end
+
     context "when tool_event has no organization_id" do
       it "does nothing (treats missing org as mismatch)" do
         tool_event = build(:tool_event, user: user, project: project, organization: nil)

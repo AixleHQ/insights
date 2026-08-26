@@ -37,6 +37,7 @@ const METADATA_BASE_KEYS = new Set([
   "cost_model",
   "scannable",
   "risk_level",
+  "model_resolution",
 ]);
 
 const METADATA_COMMIT_KEYS = new Set([
@@ -62,6 +63,7 @@ const METADATA_TRANSCRIPT_KEYS = new Set([
   "composer_name",
   "prompt_text",
   "assistant_text",
+  "model_resolution",
 ]);
 
 const METADATA_HOOK_KEYS = new Set([
@@ -168,6 +170,13 @@ export function validateCursorPayload(payload: CursorDb90Payload): PayloadValida
     }
     if (typeof meta.workspace !== "string" || meta.workspace.length === 0) {
       errors.push("metadata.workspace must be a non-empty string");
+    }
+
+    if (
+      meta.model_resolution !== undefined &&
+      !["settings_json", "state_vscdb", "unresolved"].includes(meta.model_resolution as string)
+    ) {
+      errors.push('metadata.model_resolution must be "settings_json", "state_vscdb", or "unresolved" when present');
     }
 
     if (path !== "mcp_transcript" && path !== "cursor_hook") {

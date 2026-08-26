@@ -86,13 +86,18 @@ function renderAtPath(path: string) {
 const mockProjectMember = { id: "pm-1", userId: "user-1", role: "owner" as const };
 
 function setupDefaultMocks() {
-  mockUseProject.mockReturnValue({ data: mockProject, isLoading: false });
+  mockUseProject.mockReturnValue({
+    data: mockProject,
+    isLoading: false,
+    isFetching: false,
+    isFetchedAfterMount: true,
+  });
   mockUseUpdateProject.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
   mockUseDeleteProject.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
   mockUseProjectRetentionPolicy.mockReturnValue({ data: undefined, isLoading: false });
   mockUseUpdateProjectRetentionPolicy.mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
   // Default: current user is a project member with owner role; org role is non-owner
-  mockUseProjectMembers.mockReturnValue({ data: [mockProjectMember] });
+  mockUseProjectMembers.mockReturnValue({ data: [mockProjectMember], isLoading: false });
   mockHasRole.mockReturnValue(false);
 }
 
@@ -116,11 +121,31 @@ describe("ProjectSettings", () => {
       expect(screen.getByRole("heading", { name: "My Project — Settings" })).toBeInTheDocument();
     });
 
-    it('shows "Settings" fallback in header when project is null', () => {
-      mockUseProject.mockReturnValue({ data: null, isLoading: false });
+    it("shows Project not found when project is null", () => {
+      mockUseProject.mockReturnValue({
+        data: null,
+        isLoading: false,
+        isFetching: false,
+        isFetchedAfterMount: true,
+      });
       renderAtPath("/projects/proj-1/settings");
 
-      expect(screen.getByRole("heading", { name: "Settings" })).toBeInTheDocument();
+      expect(screen.getByText("Project not found")).toBeInTheDocument();
+    });
+
+    it("shows Project not found on 404 even when stale project data remains (AIX-611)", () => {
+      mockUseProject.mockReturnValue({
+        data: mockProject,
+        isLoading: false,
+        isFetching: false,
+        isFetchedAfterMount: true,
+        isError: true,
+        error: { message: "Not found", status: 404 },
+      });
+      renderAtPath("/projects/proj-1/settings");
+
+      expect(screen.getByText("Project not found")).toBeInTheDocument();
+      expect(screen.queryByText(/My Project/)).not.toBeInTheDocument();
     });
   });
 

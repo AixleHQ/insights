@@ -14,6 +14,7 @@ import {
   warnOnCursorVersion,
   CURSOR_HOOK_STATE_PREFIX,
 } from "./cursor-hooks-mapper.js";
+import { isRepoPathWithinRoot, normalizeRepoPathCandidate } from "../lib/repo-path-safety.js";
 
 export { CURSOR_HOOK_STATE_PREFIX };
 
@@ -24,6 +25,8 @@ export interface ProcessHooksQueueParams {
   state: State;
   host: string;
   token: string;
+  /** Mirrors StoredCredentials.insecureHttpAllowed — set when `init --insecure` was used for this host. */
+  allowInsecureHttp?: boolean;
   /** Called when a 429 is received. */
   on429: (retryAfter: number, quotaExceeded: boolean) => void;
   /** If true, skip events already in state.sessions. */
@@ -39,8 +42,14 @@ export interface ProcessHooksResult {
   state: State;
 }
 
+/**
+ * `workspace` is `workspace_roots[0]` from the on-disk hooks queue — an
+ * arbitrary JSON string. A plain prefix match would accept
+ * `<scopeDir>/../../elsewhere` (AIX-547).
+ */
 function isUnderScopeDir(workspace: string, scopeDir: string): boolean {
-  return workspace === scopeDir || workspace.startsWith(scopeDir + "/");
+  const normalized = normalizeRepoPathCandidate(workspace);
+  return normalized !== null && isRepoPathWithinRoot(normalized, scopeDir);
 }
 
 /**
@@ -88,6 +97,7 @@ export async function processHooksQueue(
     scopeDir,
     host,
     token,
+    allowInsecureHttp = false,
     on429,
     skipSeen = true,
     resolveProjectId,
@@ -158,7 +168,7 @@ export async function processHooksQueue(
 
     const payload = mapHookEventToPayload(event, projectId);
 
-    const ok = await postEvent(payload, host, token, { on429 });
+    const ok = await postEvent(payload, host, token, { on429, allowInsecureHttp });
 
     if (ok) {
       totalSent++;

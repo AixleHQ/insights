@@ -658,16 +658,23 @@ export interface ConnectorHealthStats {
   status: ConnectorStatus;
   last_sync_at: string | null;
   last_error: string | null;
+  stale: boolean;
+  stuck: boolean;
   success_rate_7d: number | null;
   avg_sync_duration_ms_7d: number | null;
 }
 
+// stale/stuck/healthy are derived overlays on the status counts (stale ⊆ connected,
+// stuck ⊆ testing), not a partition — they do not sum to total.
 export interface ConnectorHealthSummary {
   total: number;
   connected: number;
   testing: number;
   error: number;
   disconnected: number;
+  stale: number;
+  stuck: number;
+  healthy: number;
 }
 
 export interface ConnectorHealthRollup {

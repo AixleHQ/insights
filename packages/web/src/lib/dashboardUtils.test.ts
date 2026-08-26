@@ -1,5 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
-import { formatDateLabel, formatLocalDate, isCurrentMonth, sliceCostTrendWindow, periodToDateRange } from "./dashboardUtils";
+import {
+  formatDateLabel,
+  formatLocalDate,
+  formatWeekRange,
+  isCurrentMonth,
+  sliceCostTrendWindow,
+  periodToDateRange,
+} from "./dashboardUtils";
 
 describe("formatDateLabel", () => {
   it("returns month+day for day granularity", () => {
@@ -10,6 +17,18 @@ describe("formatDateLabel", () => {
 
   it("returns month+year for month granularity", () => {
     expect(formatDateLabel("2026-06-01", "month")).toBe("Jun 2026");
+  });
+});
+
+describe("formatWeekRange", () => {
+  it("omits the end month when the week stays in the same month", () => {
+    expect(formatWeekRange("2026-07-06")).toBe("Jul 6 - 12");
+    expect(formatWeekRange("2026-07-13")).toBe("Jul 13 - 19");
+  });
+
+  it("includes both months when the week crosses a month boundary", () => {
+    expect(formatWeekRange("2026-06-29")).toBe("Jun 29 - Jul 5");
+    expect(formatWeekRange("2026-07-27")).toBe("Jul 27 - Aug 2");
   });
 });
 

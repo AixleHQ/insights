@@ -1,4 +1,4 @@
-import { exchangeIngestToken, type ExchangeResult } from "./exchange.js";
+import { exchangeIngestToken, OrganizationSelectionRequiredError, type ExchangeResult, type OrgOption } from "./exchange.js";
 import { defaultKeycloakClientId, defaultKeycloakIssuer, obtainKeycloakAccessTokenViaDeviceFlow } from "./keycloak.js";
 import { loadCredentials, saveStoredCredentials } from "./credentials.js";
 import type { TelemetryToolId, StoredCredentials } from "./credentials.js";
@@ -24,7 +24,7 @@ export interface LoginAndPersistOptions {
 
 export async function loginAndPersistCredentials(opts: LoginAndPersistOptions): Promise<
   | { ok: true; organizationId: string }
-  | { ok: false; error: string }
+  | { ok: false; error: string; code?: "organization_selection_required"; organizations?: OrgOption[] }
 > {
   const issuer = opts.keycloakIssuer.trim();
   if (!issuer) {
@@ -83,10 +83,13 @@ export async function loginAndPersistCredentials(opts: LoginAndPersistOptions): 
     }
 
     const existing = await loadCredentials(appDir);
+    const sameOrg =
+      existing?.host === exchanged.ingestHost && existing.organizationId === exchanged.organizationId;
     const stored: StoredCredentials = {
       host: exchanged.ingestHost,
       organizationId: exchanged.organizationId,
-      accounts: existing?.host === exchanged.ingestHost ? { ...existing.accounts } : {},
+      accounts: sameOrg ? { ...existing.accounts } : {},
+      ...(opts.allowInsecureHttp === true ? { insecureHttpAllowed: true } : {}),
     };
     for (const tid of ["claude_code", "cursor"] as const) {
       const acc = exchanged.accounts[tid];
@@ -95,6 +98,14 @@ export async function loginAndPersistCredentials(opts: LoginAndPersistOptions): 
 
     await saveStoredCredentials(stored, appDir);
   } catch (e) {
+    if (e instanceof OrganizationSelectionRequiredError) {
+      return {
+        ok: false,
+        code: "organization_selection_required",
+        organizations: e.organizations,
+        error: e.message,
+      };
+    }
     return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 

@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { afterEach, beforeEach, describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { parseArgs, runOnce, runInit, isValidDb90OrganizationUuid } from "../cli.js";
 import { DEFAULT_PRICING } from "../pricing.js";
 
@@ -260,6 +260,35 @@ describe("runOnce", () => {
     expect(received).toEqual({ projectId: "proj-uuid-once" });
   });
 
+  it("passes creds.insecureHttpAllowed through to resolveProjectId", async () => {
+    const resolveProjectId = vi.fn().mockResolvedValue({ projectId: null, source: "none" });
+    const insecureCreds = {
+      host: "http://trusted-staging.example",
+      accounts: { claude_code: "db90_test" },
+      insecureHttpAllowed: true,
+    };
+
+    const code = await runOnce({
+      loadCredentials: async () => insecureCreds,
+      migrateLegacyState: () => undefined,
+      getAppDir: () => "/tmp/db90-mcp-test",
+      pricing: DEFAULT_PRICING,
+      resolveProjectId,
+      syncTelemetryTools: async () => ({ sent: 1, failed: 0, skipped: 0 }),
+      ...silentOutput,
+    });
+
+    expect(code).toBe(0);
+    expect(resolveProjectId).toHaveBeenCalledWith(
+      undefined,
+      undefined,
+      "http://trusted-staging.example",
+      "db90_test",
+      false,
+      true
+    );
+  });
+
   it("forwards fullScan to syncTelemetryTools when requested", async () => {
     let received: { fullScan?: boolean } | null = null;
     const code = await runOnce(
@@ -466,6 +495,83 @@ describe("runInit", () => {
     expect(installCalled).toBe(false);
   });
 
+  it("prints the org list and both remediations when init returns organization_selection_required", async () => {
+    const errors: string[] = [];
+    let installCalled = false;
+    const code = await runInit(
+      {
+        command: "init",
+        help: false,
+        once: false,
+        host: "https://api.example",
+        keycloakUrl: "https://kc/realms/db90",
+        toolName: "claude_code",
+      },
+      {
+        loginAndPersistCredentials: async () => ({
+          ok: false,
+          code: "organization_selection_required",
+          error: "You belong to 2 organizations...",
+          organizations: [
+            { id: "11111111-1111-1111-1111-111111111111", name: "Acme", role: "owner" },
+            { id: "22222222-2222-2222-2222-222222222222", name: "Globex", role: "member" },
+          ],
+        }),
+        defaultKeycloakIssuer: () => "",
+        getAppDir: () => "/tmp/db90-mcp-init-test",
+        installClaudeUserMcp: () => {
+          installCalled = true;
+          return { kind: "installed" };
+        },
+        log: () => undefined,
+        error: (message) => errors.push(message),
+      }
+    );
+
+    expect(code).toBe(1);
+    expect(installCalled).toBe(false);
+    const out = errors.join("\n");
+    expect(out).toContain("You belong to 2 organizations");
+    expect(out).toContain("Acme");
+    expect(out).toContain("11111111-1111-1111-1111-111111111111");
+    expect(out).toContain("--organization-id");
+    expect(out).toContain("Default Organization"); // web Preferences remediation
+    expect(out).toContain("device login"); // re-login note
+  });
+
+  it("still prints remediations when organization_selection_required has an empty org list", async () => {
+    const errors: string[] = [];
+    const code = await runInit(
+      {
+        command: "init",
+        help: false,
+        once: false,
+        host: "https://api.example",
+        keycloakUrl: "https://kc/realms/db90",
+        toolName: "claude_code",
+      },
+      {
+        loginAndPersistCredentials: async () => ({
+          ok: false,
+          code: "organization_selection_required",
+          error: "You belong to 2 organizations...",
+          organizations: [],
+        }),
+        defaultKeycloakIssuer: () => "",
+        getAppDir: () => "/tmp/db90-mcp-init-test",
+        installClaudeUserMcp: () => ({ kind: "installed" }),
+        log: () => undefined,
+        error: (message) => errors.push(message),
+      }
+    );
+
+    expect(code).toBe(1);
+    const out = errors.join("\n");
+    expect(out).toContain("You belong to 2 organizations");
+    expect(out).toContain("--organization-id");
+    expect(out).toContain("Default Organization");
+  });
+
   it("returns 0 when login and Claude MCP install succeed", async () => {
     const installCalls: { force: boolean }[] = [];
     const code = await runInit(
@@ -651,10 +757,13 @@ describe("runInit", () => {
 
   describe("exchange organization id", () => {
     let prevOrgEnv: string | undefined;
+    let prevOrgEnvCurrent: string | undefined;
 
     beforeEach(() => {
       prevOrgEnv = process.env.DB90_ORGANIZATION_ID;
+      prevOrgEnvCurrent = process.env.AIXLE_INSIGHTS_ORGANIZATION_ID;
       delete process.env.DB90_ORGANIZATION_ID;
+      delete process.env.AIXLE_INSIGHTS_ORGANIZATION_ID;
     });
 
     afterEach(() => {
@@ -662,6 +771,11 @@ describe("runInit", () => {
         delete process.env.DB90_ORGANIZATION_ID;
       } else {
         process.env.DB90_ORGANIZATION_ID = prevOrgEnv;
+      }
+      if (prevOrgEnvCurrent === undefined) {
+        delete process.env.AIXLE_INSIGHTS_ORGANIZATION_ID;
+      } else {
+        process.env.AIXLE_INSIGHTS_ORGANIZATION_ID = prevOrgEnvCurrent;
       }
     });
 
@@ -696,7 +810,7 @@ describe("runInit", () => {
       expect(errors.some((e) => e.includes("UUID"))).toBe(true);
     });
 
-    it("prefers CLI --organization-id over DB90_ORGANIZATION_ID", async () => {
+    it("prefers CLI --organization-id over env vars", async () => {
       process.env.DB90_ORGANIZATION_ID = "00000000-0000-4000-8000-000000000001";
       let exchangeOrganizationId: string | undefined;
       const code = await runInit(
@@ -717,8 +831,8 @@ describe("runInit", () => {
       expect(exchangeOrganizationId).toBe("11111111-2222-4222-8222-333333333333");
     });
 
-    it("passes DB90_ORGANIZATION_ID when flag is omitted", async () => {
-      process.env.DB90_ORGANIZATION_ID = "00000000-0000-4000-8000-000000000001";
+    it("passes AIXLE_INSIGHTS_ORGANIZATION_ID when flag is omitted", async () => {
+      process.env.AIXLE_INSIGHTS_ORGANIZATION_ID = "00000000-0000-4000-8000-000000000001";
       let exchangeOrganizationId: string | undefined;
       const code = await runInit(baseArgs, {
         loginAndPersistCredentials: async (opts) => {
@@ -734,6 +848,43 @@ describe("runInit", () => {
       expect(code).toBe(0);
       expect(exchangeOrganizationId).toBe("00000000-0000-4000-8000-000000000001");
     });
+
+    it("falls back to deprecated DB90_ORGANIZATION_ID when the current-name env var is unset", async () => {
+      process.env.DB90_ORGANIZATION_ID = "00000000-0000-4000-8000-000000000002";
+      let exchangeOrganizationId: string | undefined;
+      const code = await runInit(baseArgs, {
+        loginAndPersistCredentials: async (opts) => {
+          exchangeOrganizationId = opts.exchangeOrganizationId;
+          return { ok: true, organizationId: "org-1" };
+        },
+        defaultKeycloakIssuer: () => "",
+        getAppDir: () => "/tmp/db90-mcp-init-test",
+        installClaudeUserMcp: () => ({ kind: "already-configured" }),
+        log: () => undefined,
+        error: () => undefined,
+      });
+      expect(code).toBe(0);
+      expect(exchangeOrganizationId).toBe("00000000-0000-4000-8000-000000000002");
+    });
+
+    it("AIXLE_INSIGHTS_ORGANIZATION_ID wins over deprecated DB90_ORGANIZATION_ID when both are set", async () => {
+      process.env.AIXLE_INSIGHTS_ORGANIZATION_ID = "00000000-0000-4000-8000-000000000003";
+      process.env.DB90_ORGANIZATION_ID = "00000000-0000-4000-8000-000000000004";
+      let exchangeOrganizationId: string | undefined;
+      const code = await runInit(baseArgs, {
+        loginAndPersistCredentials: async (opts) => {
+          exchangeOrganizationId = opts.exchangeOrganizationId;
+          return { ok: true, organizationId: "org-1" };
+        },
+        defaultKeycloakIssuer: () => "",
+        getAppDir: () => "/tmp/db90-mcp-init-test",
+        installClaudeUserMcp: () => ({ kind: "already-configured" }),
+        log: () => undefined,
+        error: () => undefined,
+      });
+      expect(code).toBe(0);
+      expect(exchangeOrganizationId).toBe("00000000-0000-4000-8000-000000000003");
+    });
   });
 });
 
@@ -742,7 +893,7 @@ describe("health CLI formatting", () => {
     const home = mkdtempSync(join(tmpdir(), "db90-health-cli-"));
     mkdirSync(home, { recursive: true });
     process.env.AIXLE_INSIGHTS_HOME = home;
-    process.env.DB90_MCP_DISABLE_KEYTAR = "true";
+    process.env.AIXLE_INSIGHTS_MCP_DISABLE_KEYTAR = "true";
     try {
       const { formatHealthForCli, buildHealthSnapshot } = await import("../health.js");
       const text = formatHealthForCli(await buildHealthSnapshot());
@@ -751,7 +902,7 @@ describe("health CLI formatting", () => {
       expect(text).toContain(`app_dir: ${home}`);
     } finally {
       delete process.env.AIXLE_INSIGHTS_HOME;
-      delete process.env.DB90_MCP_DISABLE_KEYTAR;
+      delete process.env.AIXLE_INSIGHTS_MCP_DISABLE_KEYTAR;
     }
   });
 });

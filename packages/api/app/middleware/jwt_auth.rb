@@ -21,7 +21,15 @@ class JwtAuth
 
   EXCLUDED_PATTERNS = [
     /\A\/api\/v1\/invitations\/(?!check\z)[^\/]+\z/,
-    /\A\/api\/v1\/webhooks\/openrouter_traces\/[^\/]+\z/
+    /\A\/api\/v1\/webhooks\/openrouter_traces\/[^\/]+\z/,
+    # Generic provider webhook receiver (github/gitlab/bitbucket/jira/linear) — external
+    # providers authenticate via an HMAC/token signature header (see
+    # Api::V1::WebhooksController#verify_signature!), never a Bearer JWT. Without this, no
+    # real webhook delivery can ever reach the controller.
+    # NOTE: this regex excludes ANY two-segment path under /api/v1/webhooks/. Any future
+    # webhook endpoint added under this prefix bypasses JWT auth automatically — verify
+    # that is intentional before adding it here.
+    /\A\/api\/v1\/webhooks\/[^\/]+\/[^\/]+\z/
   ].freeze
 
   def initialize(app)

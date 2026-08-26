@@ -123,7 +123,7 @@ export function EventDrawer({
     asMetadataString(event?.metadata?.author_name) ?? asMetadataString(event?.metadata?.git_author_email);
 
   const recentCommit = event
-    ? parseRecentCommitFields(event.metadata, event.eventType)
+    ? parseRecentCommitFields(event.metadata, event.eventType, event.toolName)
     : null;
   const isDerivative = event ? isDerivativeEvent(event.eventType) : false;
   const emptyPromptMessage = isDerivative

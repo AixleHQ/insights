@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { randomBytes } from "node:crypto";
+import { readEnvWithDeprecatedAlias, warnDeprecatedEnvVar } from "../lib/env.js";
 
 /**
  * User-scope Claude Code MCP servers live in ~/.claude.json under top-level `mcpServers`
@@ -20,7 +21,11 @@ export interface InstallClaudeUserMcpOptions {
 }
 
 export function defaultClaudeUserConfigPath(): string {
-  const override = process.env["DB90_CLAUDE_USER_CONFIG_PATH"]?.trim();
+  const override = readEnvWithDeprecatedAlias({
+    current: "AIXLE_INSIGHTS_CLAUDE_USER_CONFIG_PATH",
+    deprecated: "DB90_CLAUDE_USER_CONFIG_PATH",
+    onDeprecatedUse: warnDeprecatedEnvVar,
+  });
   if (override) return override;
   return join(homedir(), ".claude.json");
 }

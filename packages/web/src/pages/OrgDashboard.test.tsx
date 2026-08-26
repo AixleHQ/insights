@@ -34,6 +34,7 @@ const mockUseActiveUsers = vi.fn();
 const mockUseDailyStats = vi.fn();
 const mockUseEvents = vi.fn();
 const mockUseProjects = vi.fn();
+const mockUseOrganizationMembers = vi.fn();
 
 vi.mock("@/hooks/useApi", () => ({
   clientTimezone: "America/Montevideo",
@@ -42,17 +43,16 @@ vi.mock("@/hooks/useApi", () => ({
   useDailyStats: (...args: unknown[]) => mockUseDailyStats(...args),
   useEvents: (...args: unknown[]) => mockUseEvents(...args),
   useProjects: (...args: unknown[]) => mockUseProjects(...args),
-  useEvent: () => ({ data: undefined, isLoading: false }),
+  useOrganizationMembers: (...args: unknown[]) => mockUseOrganizationMembers(...args),
 }));
 
-vi.mock("@/components/dashboard", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/components/dashboard")>();
+vi.mock("@/components/dashboard", async () => {
+  const actual = await vi.importActual<typeof import("@/components/dashboard")>(
+    "@/components/dashboard"
+  );
+
   return {
-    // Keep the real filter controls — the deep-link tests drive their comboboxes.
-    ProjectFilterDropdown: actual.ProjectFilterDropdown,
-    MemberPeriodSelect: actual.MemberPeriodSelect,
-    MetricCard: () => null,
-    MetricGrid: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+    ...actual,
     CostTrendChart: () => null,
     ActivityFeed: (props: { viewAllTo?: string }) => (
       <a data-testid="activity-view-all" href={props.viewAllTo}>
@@ -80,6 +80,7 @@ function setupDefaultMocks() {
   mockUseDailyStats.mockReturnValue({ data: undefined, isLoading: false, isError: false, refetch: vi.fn() });
   mockUseEvents.mockReturnValue({ data: { data: [] }, isLoading: false, isError: false, refetch: vi.fn() });
   mockUseProjects.mockReturnValue({ data: [{ id: "proj-1", name: "Project One" }] });
+  mockUseOrganizationMembers.mockReturnValue({ data: [{ id: "m1" }, { id: "m2" }] });
 }
 
 describe("OrgDashboard", () => {
@@ -106,6 +107,36 @@ describe("OrgDashboard", () => {
 
     expect(mockUseOverviewStats).toHaveBeenLastCalledWith("org-2", undefined, expect.anything());
     expect(mockUseActiveUsers).toHaveBeenLastCalledWith("org-2", undefined, 7);
+  });
+
+  it("renders Active Members as active/total with token Risk subtitle", () => {
+    mockUseActiveUsers.mockReturnValue({ data: { active_users: 80 } });
+    mockUseOverviewStats.mockReturnValue({
+      data: {
+        total_events: 1500,
+        total_cost_usd: 212.1,
+        risk_alerts: 0,
+        active_users: 80,
+        total_tokens_in: 1_240_000,
+        total_tokens_out: 1_780_000,
+        events_change_percent: null,
+        cost_change_percent: null,
+      },
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+
+    render(<OrgDashboard />);
+    expect(screen.getByText("80/2")).toBeInTheDocument();
+    expect(screen.getByText("1.2M In · 1.8M Out")).toBeInTheDocument();
+  });
+
+  // F4-S1 AC: Team tab project filter unscoped label is "All Projects"
+  it("renders All Projects as the Team tab project filter label", () => {
+    render(<OrgDashboard />);
+    expect(screen.getByText("All Projects")).toBeInTheDocument();
+    expect(screen.queryByText("All Activity")).not.toBeInTheDocument();
   });
 });
 

@@ -11,7 +11,7 @@ module Admin
     # rejected). Lets #authenticate tell the user "try again" instead of "session expired".
     class UnavailableError < StandardError; end
 
-    def authorize_url(redirect_uri, code_verifier)
+    def authorize_url(redirect_uri, code_verifier, state)
       params = {
         client_id: config.audience,
         redirect_uri: redirect_uri,
@@ -19,7 +19,8 @@ module Admin
         scope: "openid profile email",
         code_challenge: pkce_challenge(code_verifier),
         code_challenge_method: "S256",
-        kc_idp_hint: "google-dbp"
+        kc_idp_hint: "google-dbp",
+        state: state
       }
       "#{config.authorize_url}?#{params.to_query}"
     end

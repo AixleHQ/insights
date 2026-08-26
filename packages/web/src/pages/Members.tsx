@@ -26,7 +26,9 @@ import {
   useCreateNotificationRoute,
   useUpdateNotificationRoute,
   useDeleteNotificationRoute,
+  type MemberStatsRange,
 } from "@/hooks/useApi";
+import { RANGE_OPTIONS, RANGE_SUBTITLE } from "@/lib/memberStatsRange";
 import type { Invitation, NotificationRoute, OrganizationMember } from "@/lib/types";
 import { AppRoutes } from "@/lib/routes";
 import { formatCost, formatCount } from "@/lib/formatters";
@@ -130,8 +132,11 @@ export function Members() {
   const [roleFilter, setRoleFilter] = useState<MemberRole | "all">("all");
   const [sortField, setSortField] = useState<MemberSortField>("name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [statsRange, setStatsRange] = useState<MemberStatsRange>("30d");
 
-  const { data: membersData, isLoading } = useOrganizationMembers(currentOrg?.id || "");
+  const { data: membersData, isLoading } = useOrganizationMembers(currentOrg?.id || "", {
+    range: statsRange,
+  });
   const { data: invitationsData } = useInvitations(currentOrg?.id || "", "pending");
   const updateMemberRole = useUpdateMemberRole();
   const removeMember = useRemoveMember();
@@ -301,6 +306,25 @@ export function Members() {
           </div>
         </div>
       )}
+
+      <div className="flex items-center justify-between gap-3">
+        <p className="type-caption text-muted-foreground">
+          Events &amp; Cost: {RANGE_SUBTITLE[statsRange]}
+        </p>
+        <div className="flex gap-1">
+          {RANGE_OPTIONS.map((opt) => (
+            <Button
+              key={opt.value}
+              variant={statsRange === opt.value ? "default" : "ghost"}
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => setStatsRange(opt.value)}
+            >
+              {opt.label}
+            </Button>
+          ))}
+        </div>
+      </div>
 
       <div className="rounded-md border overflow-x-auto">
         <Table className="min-w-[720px]">

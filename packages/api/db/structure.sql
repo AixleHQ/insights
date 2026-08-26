@@ -735,7 +735,8 @@ CREATE TABLE public.organization_connectors (
     webhook_active boolean DEFAULT false NOT NULL,
     connector_scope character varying DEFAULT 'org'::character varying NOT NULL,
     activity_sync_started_at timestamp(6) without time zone,
-    label character varying
+    label character varying,
+    testing_started_at timestamp(6) without time zone
 );
 
 --
@@ -2775,6 +2776,7 @@ ALTER TABLE ONLY timeseries.tool_events
 SET search_path TO "$user", public;
 
 INSERT INTO "schema_migrations" (version) VALUES
+('20260806120000'),
 ('20260722153000'),
 ('20260714120000'),
 ('20260706203934'),

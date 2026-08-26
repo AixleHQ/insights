@@ -14,13 +14,13 @@ import {
   Plug,
 } from "lucide-react";
 import {
-  useProject,
   useUpdateProject,
   useDeleteProject,
   useCurrentUser,
   useProjectMembers,
   type ProjectMember,
 } from "@/hooks/useApi";
+import { useProjectAccess } from "@/hooks/useProjectAccess";
 import { useOrg } from "@/contexts/OrgContext";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -289,7 +289,7 @@ function ProjectGeneralSettings({
   isLoading,
 }: {
   projectId: string;
-  project: ReturnType<typeof useProject>["data"];
+  project: ReturnType<typeof useProjectAccess>["project"];
   isLoading: boolean;
 }) {
   if (isLoading) {
@@ -327,7 +327,11 @@ function ProjectGeneralSettings({
 
 export function ProjectSettings() {
   const { id } = useParams<{ id: string }>();
-  const { data: project, isLoading: isLoadingProject } = useProject(id || "");
+  const {
+    project,
+    isLoading: isLoadingProject,
+    isAccessDenied,
+  } = useProjectAccess(id || "");
   const { hasRole } = useOrg();
   const { data: me } = useCurrentUser();
   const { data: projectMembers = [], isLoading: isLoadingMembers } = useProjectMembers(id ?? "");
@@ -341,6 +345,7 @@ export function ProjectSettings() {
 
   // Project settings management is owner-only (backend ProjectPolicy#settings? == update?).
   // Wait for project + membership data to resolve, then redirect non-owners away entirely.
+  // Access-denied (403/404) must win over stale cached project data (AIX-611).
   if (isLoadingProject || isLoadingMembers) {
     return (
       <div className="space-y-6">
@@ -348,6 +353,10 @@ export function ProjectSettings() {
         <Skeleton className="h-[300px]" />
       </div>
     );
+  }
+
+  if (isAccessDenied || !project) {
+    return <ProjectNotFound />;
   }
 
   if (!isProjectOwner) {

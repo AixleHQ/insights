@@ -55,8 +55,8 @@ RSpec.describe ProjectAuditLogPolicy, type: :policy do
         expect(policy(project, current_user: project_viewer_user).apply(:index?)).to be false
       end
 
-      it "allows global admin" do
-        expect(policy(project, current_user: global_admin).apply(:index?)).to be true
+      it "denies global admin without project/org admin role (AIX-611)" do
+        expect(policy(project, current_user: global_admin).apply(:index?)).to be false
       end
 
       it "denies org member with no project role" do
@@ -77,8 +77,8 @@ RSpec.describe ProjectAuditLogPolicy, type: :policy do
         expect(policy(personal_project, current_user: other_user).apply(:index?)).to be false
       end
 
-      it "allows global admin" do
-        expect(policy(personal_project, current_user: global_admin).apply(:index?)).to be true
+      it "denies global admin who does not own the personal project (AIX-611)" do
+        expect(policy(personal_project, current_user: global_admin).apply(:index?)).to be false
       end
     end
   end
@@ -102,8 +102,8 @@ RSpec.describe ProjectAuditLogPolicy, type: :policy do
       expect(policy(project, current_user: org_admin).apply(:full_access?)).to be true
     end
 
-    it "grants global admin full access" do
-      expect(policy(project, current_user: global_admin).apply(:full_access?)).to be true
+    it "denies global admin full access without org ownership (AIX-611)" do
+      expect(policy(project, current_user: global_admin).apply(:full_access?)).to be false
     end
 
     it "denies project admin (non-org-admin) full access" do
@@ -133,9 +133,9 @@ RSpec.describe ProjectAuditLogPolicy, type: :policy do
       policy.apply_scope(ProjectAuditLog.all, type: :active_record_relation)
     end
 
-    it "returns all project logs for global admin" do
+    it "excludes unrelated projects for global admin without membership (AIX-611)" do
       result = scoped(global_admin)
-      expect(result).to include(log_in_project, log_in_other_project, log_unrelated)
+      expect(result).not_to include(log_in_project, log_in_other_project, log_unrelated)
     end
 
     it "returns all org projects' logs for org admin" do

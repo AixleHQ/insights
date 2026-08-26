@@ -21,7 +21,7 @@ module IngestTokenAuthentication
   end
 
   def ingest_token_authorized?
-    return false unless @tool_account&.organization.present?
+    return false unless @tool_account&.organization&.is_active?
     return true if @tool_account.active?
 
     # Ingest tools are allowed through while waiting_for_connection so the first

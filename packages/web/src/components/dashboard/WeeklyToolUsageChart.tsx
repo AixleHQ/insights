@@ -26,13 +26,15 @@ import type { ChartConfig } from "@/components/ui/chart";
 import { ChartSkeleton } from "@/components/ui/skeletons";
 import { ErrorState } from "@/components/ui/error-state";
 import { cn, getToolColor, humanizeToolName } from "@/lib/utils";
+import { formatCount, periodLabel } from "@/lib/formatters";
 import { useDailyByTool, useDailyByModel } from "@/hooks/useApi";
 import type { DashboardPeriod } from "@/lib/types";
-import { currentMonth, getLast12Months } from "@/lib/dashboardUtils";
+import { currentMonth, formatWeekRange, getLast12Months, projectScopeLabel } from "@/lib/dashboardUtils";
 
 interface WeeklyToolUsageChartProps {
   orgId: string;
   projectId?: string;
+  projects?: { id: string; name: string }[];
   externalPeriod?: DashboardPeriod;
   className?: string;
   selectedMonth?: string;
@@ -54,20 +56,19 @@ function getModelColor(index: number): string {
   return MODEL_PALETTE[index % MODEL_PALETTE.length];
 }
 
-function formatWeekDate(dateStr: string): string {
-  const start = new Date(dateStr + "T00:00:00");
-  const end = new Date(start);
-  end.setDate(end.getDate() + 6);
-
-  const fmt = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-
-  if (start.getMonth() === end.getMonth()) {
-    return `${fmt(start)} – ${end.getDate()}`;
-  }
-  return `${fmt(start)} – ${fmt(end)}`;
+function formatMonthLabel(monthValue: string): string {
+  return periodLabel({ type: "month", value: monthValue });
 }
 
-export function WeeklyToolUsageChart({ orgId, projectId, externalPeriod, className, selectedMonth: selectedMonthProp, onMonthChange }: WeeklyToolUsageChartProps) {
+export function WeeklyToolUsageChart({
+  orgId,
+  projectId,
+  projects,
+  externalPeriod,
+  className,
+  selectedMonth: selectedMonthProp,
+  onMonthChange,
+}: WeeklyToolUsageChartProps) {
   const [groupBy, setGroupBy] = useState<"tool" | "model">("tool");
   const [internalMonth, setInternalMonth] = useState(currentMonth);
 
@@ -78,31 +79,39 @@ export function WeeklyToolUsageChart({ orgId, projectId, externalPeriod, classNa
 
   const selectedMonth = selectedMonthProp ?? internalMonth;
   const setSelectedMonth = onMonthChange ?? setInternalMonth;
+  const activeMonth = externalPeriod?.type === "month" ? externalPeriod.value : selectedMonth;
 
   const opts = useMemo(() => {
     if (isAllTime) return { allTime: true, period: "month" as const, projectId };
-    const month = externalPeriod?.value ?? selectedMonth;
-    return { period: "week" as const, month, projectId };
-  }, [isAllTime, externalPeriod, selectedMonth, projectId]);
+    // Figma Team dashboard: Tool and Model both use weekly grouped bars.
+    return { period: "week" as const, month: activeMonth, projectId };
+  }, [isAllTime, activeMonth, projectId]);
 
-  const { data: toolData, isLoading: isLoadingTool, isError: isErrorTool, refetch: refetchTool } = useDailyByTool(orgId, opts);
-  const { data: modelData, isLoading: isLoadingModel, isError: isErrorModel, refetch: refetchModel } = useDailyByModel(orgId, opts);
+  const { data: toolData, isLoading: isLoadingTool, isError: isErrorTool, refetch: refetchTool } =
+    useDailyByTool(orgId, opts);
+  const { data: modelData, isLoading: isLoadingModel, isError: isErrorModel, refetch: refetchModel } =
+    useDailyByModel(orgId, opts);
 
   const isLoading = groupBy === "tool" ? isLoadingTool : isLoadingModel;
   const isError = groupBy === "tool" ? isErrorTool : isErrorModel;
   const refetch = groupBy === "tool" ? refetchTool : refetchModel;
 
-  const useMonthlyLabels = isAllTime || opts.period === "month";
+  const { keys, chartData, chartConfig, totalEvents } = useMemo(() => {
+    const formatLabel = (dateStr: string) => {
+      if (isAllTime) {
+        return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
+          month: "short",
+          year: "numeric",
+        });
+      }
+      return formatWeekRange(dateStr);
+    };
 
-  const { keys, chartData, chartConfig } = useMemo(() => {
-    const formatLabel = (dateStr: string) =>
-      useMonthlyLabels
-        ? new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", { month: "short", year: "numeric" })
-        : formatWeekDate(dateStr);
+    type ChartRow = { date: string; dateLabel: string; [key: string]: string | number };
 
     if (groupBy === "tool") {
       const tools = toolData?.tools ?? [];
-      const data = (toolData?.data ?? []).map((row) => ({
+      const data: ChartRow[] = (toolData?.data ?? []).map((row) => ({
         ...row,
         dateLabel: formatLabel(row.date),
       }));
@@ -110,31 +119,63 @@ export function WeeklyToolUsageChart({ orgId, projectId, externalPeriod, classNa
       tools.forEach((tool) => {
         config[tool] = { label: humanizeToolName(tool), color: getToolColor(tool) };
       });
-      return { keys: tools, chartData: data, chartConfig: config };
-    } else {
-      const models = modelData?.models ?? [];
-      const data = (modelData?.data ?? []).map((row) => ({
-        ...row,
-        dateLabel: formatLabel(row.date),
-      }));
-      const config: ChartConfig = {};
-      models.forEach((model, i) => {
-        config[model] = { label: model, color: getModelColor(i) };
-      });
-      return { keys: models, chartData: data, chartConfig: config };
+      const events = data.reduce(
+        (sum, row) => sum + tools.reduce((s, tool) => s + (Number(row[tool]) || 0), 0),
+        0
+      );
+      return { keys: tools, chartData: data, chartConfig: config, totalEvents: events };
     }
-  }, [groupBy, toolData, modelData, useMonthlyLabels]);
+
+    const models = modelData?.models ?? [];
+    const data: ChartRow[] = (modelData?.data ?? []).map((row) => ({
+      ...row,
+      dateLabel: formatLabel(row.date),
+    }));
+    const config: ChartConfig = {};
+    models.forEach((model, i) => {
+      config[model] = { label: model, color: getModelColor(i) };
+    });
+    const events = data.reduce(
+      (sum, row) => sum + models.reduce((s, model) => s + (Number(row[model]) || 0), 0),
+      0
+    );
+    return { keys: models, chartData: data, chartConfig: config, totalEvents: events };
+  }, [groupBy, toolData, modelData, isAllTime]);
 
   const getColor = (key: string, index: number) =>
     groupBy === "tool" ? getToolColor(key) : getModelColor(index);
 
+  const scopeLabel = projects ? projectScopeLabel(projectId, projects, "Usage data") : undefined;
+  const chartTitle = groupBy === "tool" ? "Usage by tool" : "Usage by model";
+  const periodSubtitle = isAllTime ? "all time" : formatMonthLabel(activeMonth);
+  const chartSubtitle = [scopeLabel, `${formatCount(totalEvents)} events`, periodSubtitle]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <Card className={cn("col-span-full", className)}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-base font-medium">
-          {isAllTime ? "Monthly Usage" : "Weekly Usage"}
-        </CardTitle>
+      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+        <div className="space-y-1">
+          <CardTitle className="text-base font-medium">{chartTitle}</CardTitle>
+          {!isLoading && !isError && chartData.length > 0 && (
+            <p className="text-sm text-muted-foreground">{chartSubtitle}</p>
+          )}
+        </div>
         <div className="flex items-center gap-2">
+          {!controlled && (
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="h-8 w-36 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {months.map((m) => (
+                  <SelectItem key={m.value} value={m.value} className="text-xs">
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <div className="flex rounded-md border overflow-hidden">
             <Button
               size="sm"
@@ -153,20 +194,6 @@ export function WeeklyToolUsageChart({ orgId, projectId, externalPeriod, classNa
               Model
             </Button>
           </div>
-          {!controlled && (
-            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-              <SelectTrigger className="h-8 w-36 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {months.map((m) => (
-                  <SelectItem key={m.value} value={m.value} className="text-xs">
-                    {m.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
         </div>
       </CardHeader>
       <CardContent>
@@ -210,10 +237,18 @@ export function WeeklyToolUsageChart({ orgId, projectId, externalPeriod, classNa
                         <span className="flex items-center gap-2">
                           <span
                             className="size-2 rounded-full"
-                            style={{ backgroundColor: getColor(name as string, keys.indexOf(name as string)) }}
+                            style={{
+                              backgroundColor: getColor(
+                                name as string,
+                                keys.indexOf(name as string)
+                              ),
+                            }}
                           />
                           <span>
-                            {groupBy === "tool" ? humanizeToolName(name as string) : (name as string)}: {value}
+                            {groupBy === "tool"
+                              ? humanizeToolName(name as string)
+                              : (name as string)}
+                            : {value}
                           </span>
                         </span>
                       )}
@@ -221,14 +256,16 @@ export function WeeklyToolUsageChart({ orgId, projectId, externalPeriod, classNa
                   }
                 />
                 <Legend
-                  verticalAlign="top"
-                  align="right"
-                  wrapperStyle={{ paddingBottom: "10px" }}
+                  verticalAlign="bottom"
+                  align="center"
+                  wrapperStyle={{ paddingTop: "10px" }}
                   iconType="circle"
                   iconSize={8}
                   formatter={(value) => (
                     <span className="text-xs text-muted-foreground">
-                      {groupBy === "tool" ? humanizeToolName(value as string) : (value as string)}
+                      {groupBy === "tool"
+                        ? humanizeToolName(value as string)
+                        : (value as string)}
                     </span>
                   )}
                 />

@@ -2,9 +2,10 @@
 
 class ProjectAuditLogPolicy < ApplicationPolicy
   # record = @project (Project instance)
+  # Tenant access follows membership — no global_admin bypass on the member-facing API.
+  # Platform break-glass stays in Administrate (AIX-611).
 
   def index?
-    return true if global_admin?
     return own_personal_project? if record.personal?
     return project_admin?(record) || org_owner?(record.organization) if record.organization_project?
 
@@ -19,7 +20,6 @@ class ProjectAuditLogPolicy < ApplicationPolicy
   # Full access = ip_address, tracked_changes, and user_agent visible (org-admin level and above)
   def full_access?
     @full_access ||= begin
-      return true if global_admin?
       return own_personal_project? if record.personal?
       return org_owner?(record.organization) if record.organization_project?
 
@@ -30,9 +30,7 @@ class ProjectAuditLogPolicy < ApplicationPolicy
   relation_scope do |scope|
     # NOTE: `record` here is ProjectAuditLog (the class), not the project instance.
     # Use `user` and membership scopes directly; do not reference `record`.
-    if global_admin?
-      scope.all
-    elsif user
+    if user
       project_admin_ids = user.project_memberships.admins.select(:project_id)
       accessible_project_ids = Project
         .where(organization_id: user.organization_memberships.admins.select(:organization_id))

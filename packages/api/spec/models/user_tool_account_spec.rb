@@ -168,6 +168,31 @@ RSpec.describe UserToolAccount, type: :model do
     end
   end
 
+  describe 'ingest-token hash rationale (AC3, AIX-371)' do
+    let(:model_source) { Rails.root.join('app/models/user_tool_account.rb').read }
+    let(:rationale) do
+      model_source.match(/((?:^\s*#.*\n)+)\s*def self\.find_by_ingest_token/)&.captures&.first
+    end
+
+    it 'documents the SHA-256 design rationale directly above the method' do
+      expect(rationale).to be_present
+
+      expect(rationale).to include('SECURITY (OWASP A02-2, AIX-371)')
+      expect(rationale).to include('256 bits of entropy')
+      expect(rationale).to include('hot path')
+      expect(rationale).to include('bcrypt/argon2')
+      expect(rationale).to include('GitHub')
+      expect(rationale).to include('Stripe')
+      expect(rationale).to include('GitLab')
+    end
+
+    it 'implements the lookup as a direct SHA-256 hash match, not a slow salted hash' do
+      expect(model_source).to include(
+        'find_by(token_hash: Digest::SHA256.hexdigest(raw_token))'
+      )
+    end
+  end
+
   describe '#token_expired?' do
     it 'returns false when token_expires_at is nil' do
       account = build(:user_tool_account, token_expires_at: nil)

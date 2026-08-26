@@ -1,8 +1,45 @@
-# Local MCP setup (npm not published yet)
+# Local MCP setup
 
-Step-by-step guide for running **`@aixle/insights`** against the **db90-rails** Docker stack while the package is **not on npm** (`npx @aixle/insights` → 404).
+Step-by-step guide for running **`@aixle/insights`** against the **db90-rails** Docker stack.
 
-> **TL;DR:** build the CLI from the monorepo, run `init` against local Keycloak, **patch `~/.claude.json`** to point at the local `dist/cli.js` (because `init` writes `npx`), start the **Temporal worker**, and verify in the Events UI.
+> **The package is now published.** This document originally existed because `@aixle/insights` was
+> not on npm and `npx @aixle/insights` returned 404. That is no longer true — see
+> `npm view @aixle/insights dist-tags`. **If you only want telemetry flowing against the local
+> stack, you do not need any of the build-from-source steps below.**
+
+## Which path do you need?
+
+| You want to… | Use |
+|---|---|
+| Run the **published** CLI against your local stack | the fast path immediately below — no build, no manual `~/.claude.json` edit |
+| **Develop this package** and run your own edits | the numbered sections from §2 onward (build + `npm link` or a `dist/cli.js` path) |
+
+### Fast path — published CLI against the local stack
+
+```bash
+make up          # from the repo root: Postgres, Keycloak, Redis, Temporal, MinIO
+make worker      # Temporal worker — REQUIRED, ingest returns 202 without it
+
+npx -y @aixle/insights init \
+  --host http://localhost:3000 \
+  --keycloak-url http://localhost:8080/realms/db90
+
+# restart your editor, then:
+aixle-insights health
+aixle-insights run --once
+```
+
+`init` writes the MCP entry itself, so **§4's manual `~/.claude.json` patch does not apply** on
+this path — that step exists only because a from-source build has to override the `npx` command
+`init` would otherwise write. Loopback hosts are exempt from the HTTPS gate, so plain
+`http://localhost` needs no `--insecure`.
+
+Everything below still applies for **package development**, and §1, §6 and §8 (stack, end-to-end
+verification, troubleshooting) are worth reading on either path.
+
+> **TL;DR (from-source path):** build the CLI from the monorepo, run `init` against local Keycloak,
+> **patch `~/.claude.json`** to point at the local `dist/cli.js` (because `init` writes `npx`),
+> start the **Temporal worker**, and verify in the Events UI.
 
 ---
 
@@ -76,7 +113,7 @@ Local Keycloak uses realm **`db90`**, client **`db90-web`**, with **Device Autho
 ```bash
 cd packages/tools
 
-export DB90_MCP_USE_LOCAL_KEYCLOAK_DEFAULT=true
+export AIXLE_INSIGHTS_MCP_USE_LOCAL_KEYCLOAK_DEFAULT=true
 
 node aixle-insights/dist/cli.js init \
   --host http://localhost:3000 \
@@ -89,7 +126,7 @@ Flow:
 2. Open the link in a browser, sign in to Keycloak, approve the code.
 3. If Keycloak shows a blank page on device login or OAuth consent, restart Keycloak (`docker compose restart keycloak`) — the `db90` theme fixes are in the repo.
 
-**Organization:** by default `init` uses your **oldest** membership. If you belong to multiple orgs:
+**Organization:** if your account belongs to a single org, `init` binds it automatically. If you belong to **multiple** orgs, `init` binds your web **Default Organization** preference (`default_org_id`); with no valid preference it lists your orgs and exits non-zero without saving credentials (re-running then requires completing the device login again). Scope explicitly with `--organization-id`:
 
 ```bash
 node aixle-insights/dist/cli.js init \
@@ -98,10 +135,20 @@ node aixle-insights/dist/cli.js init \
   --organization-id <your-org-uuid>
 ```
 
+Run `node aixle-insights/dist/cli.js health` to see the bound `organization_id`.
+
 Credentials are stored in:
 
 - **macOS:** Keychain (via `keytar`) — `~/.aixle-insights/credentials.json` may not exist
 - **Fallback:** `~/.aixle-insights/credentials.json` (mode `0600`)
+
+On **read** the keychain wins: it is consulted first, and the file is only used when the keychain is
+unavailable, empty, or disabled via `AIXLE_INSIGHTS_MCP_DISABLE_KEYTAR`. So hand-editing `credentials.json`
+for local testing has **no effect** while a keychain entry exists — you get a
+`credentials_file_shadowed_by_keychain` line in `mcp.log` and the keychain value is used. Either
+clear the keychain entry or export `AIXLE_INSIGHTS_MCP_DISABLE_KEYTAR=1` for the session. A file that is
+present but corrupt or the wrong shape is likewise ignored, with a `credentials_parse_failed` line —
+see the README's **Diagnostics** section.
 
 Verify:
 
@@ -115,7 +162,8 @@ Expected: `authenticated: true`, `host: http://localhost:3000`, `ingest_tools: c
 
 ## 4. Patch `~/.claude.json` (critical step)
 
-`init` merges an MCP server named **`db90`** into **`~/.claude.json`** with:
+`init` merges an MCP server named **`aixle-insights`** into **`~/.claude.json`** with (it also
+removes any legacy `db90` key left over from before the rename):
 
 ```json
 "command": "npx",
@@ -135,7 +183,7 @@ cp ~/.claude.json ~/.claude.json.bak && \
 jq --arg cli "$CLI" '.mcpServers["aixle-insights"] = {
   "command": "node",
   "args": [$cli, "run"],
-  "env": { "DB90_API_URL": "http://localhost:3000" }
+  "env": { "AIXLE_INSIGHTS_API_URL": "http://localhost:3000" }
 }' ~/.claude.json > ~/.claude.json.tmp && mv ~/.claude.json.tmp ~/.claude.json
 ```
 
@@ -151,7 +199,7 @@ In `~/.claude.json` → `mcpServers["aixle-insights"]`:
     "run"
   ],
   "env": {
-    "DB90_API_URL": "http://localhost:3000"
+    "AIXLE_INSIGHTS_API_URL": "http://localhost:3000"
   }
 }
 ```
@@ -236,7 +284,7 @@ If Temporal is down, the API may **fallback to direct insert** (logs: `Temporal 
 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|
-| `/mcp` missing `db90` or **failed** | `npx @aixle/insights` in `~/.claude.json` | Section 4 — patch to `node …/dist/cli.js` |
+| `/mcp` missing `aixle-insights` or **failed** | `npx @aixle/insights` in `~/.claude.json` | Section 4 — patch to `node …/dist/cli.js` |
 | `health` → `authenticated: false` | No credentials / incomplete init | Re-run `init` (section 3) |
 | `sent: N`, UI empty of **new** events | Worker not running | `make worker` |
 | Keycloak device login blank page | Theme CSS | `docker compose restart keycloak`; pull latest `keycloak/themes/db90/` |
@@ -248,7 +296,7 @@ If Temporal is down, the API may **fallback to direct insert** (logs: `Temporal 
 ### Useful logs
 
 ```bash
-~/.aixle-insights/mcp.log          # sync, skips, MCP errors
+~/.aixle-insights/mcp.log          # sync, skips, MCP errors, local-store rejections
 docker logs db90-api           # ingest 202 / fallback
 docker logs db90-worker        # sanitization + persist
 ```
@@ -269,7 +317,7 @@ npm ci
 # SDK is now inlined; only the package itself needs building
 npm run build --workspace=@aixle/insights
 
-export DB90_MCP_USE_LOCAL_KEYCLOAK_DEFAULT=true
+export AIXLE_INSIGHTS_MCP_USE_LOCAL_KEYCLOAK_DEFAULT=true
 node aixle-insights/dist/cli.js init \
   --host http://localhost:3000 \
   --keycloak-url http://localhost:8080/realms/db90

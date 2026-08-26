@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { IntegrationCard, type IntegrationData, type ProviderInfo } from "./IntegrationCard";
+import type { ConnectorHealthStats } from "@/lib/types";
 
 const baseIntegration: IntegrationData = {
   id: "conn-1",
@@ -130,6 +131,63 @@ describe("IntegrationCard — connected integration", () => {
 
       await user.click(toggle); // collapse
       expect(screen.queryByText("Connection refused")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("stale / stuck callouts", () => {
+    const health = (over: Partial<ConnectorHealthStats>): ConnectorHealthStats => ({
+      id: "conn-1",
+      connector_type: "anthropic",
+      status: "connected",
+      last_sync_at: null,
+      last_error: null,
+      stale: false,
+      stuck: false,
+      success_rate_7d: null,
+      avg_sync_duration_ms_7d: null,
+      ...over,
+    });
+
+    it("shows a stuck callout when healthStats.stuck is true", () => {
+      render(
+        <IntegrationCard
+          integration={{ ...baseIntegration, status: "testing" }}
+          healthStats={health({ status: "testing", stuck: true })}
+        />
+      );
+      expect(screen.getByText(/sync stuck/i)).toBeInTheDocument();
+    });
+
+    it("shows a stale callout with last-synced age when last_sync_at is present", () => {
+      const lastSync = new Date(Date.now() - 10 * 60 * 60 * 1000).toISOString();
+      render(
+        <IntegrationCard
+          integration={{ ...baseIntegration, last_sync_at: lastSync }}
+          healthStats={health({ stale: true, last_sync_at: lastSync })}
+        />
+      );
+      expect(screen.getByText(/sync is stale/i)).toBeInTheDocument();
+    });
+
+    it("shows 'Never synced' when stale and last_sync_at is null", () => {
+      render(
+        <IntegrationCard
+          integration={baseIntegration}
+          healthStats={health({ stale: true, last_sync_at: null })}
+        />
+      );
+      expect(screen.getByText(/never synced/i)).toBeInTheDocument();
+    });
+
+    it("shows no callout when neither stale nor stuck", () => {
+      render(
+        <IntegrationCard
+          integration={baseIntegration}
+          healthStats={health({})}
+        />
+      );
+      expect(screen.queryByText(/sync stuck/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/sync is stale/i)).not.toBeInTheDocument();
     });
   });
 

@@ -2,6 +2,8 @@ import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { createHash, randomBytes } from "node:crypto";
+import { mcpLog } from "./log.js";
+import { describeReadFailure } from "./lib/parse-error.js";
 
 export interface SessionRecord {
   /** File size in bytes when this session was last successfully sent. */
@@ -63,7 +65,7 @@ export function getAppDir(): string {
 /**
  * Derives a per-credential filename stem.
  * Format: `state-<hostname>-<8-char token hash>`
- * Example: `state-app.db90.io-a1b2c3d4.json`
+ * Example: `state-app.insights.example.com-a1b2c3d4.json`
  */
 export function stateKey(host: string, token: string): string {
   let hostname: string;
@@ -148,43 +150,48 @@ export function migrateLegacyState(dir: string, host: string, token: string): vo
 
 export function readState(dir?: string, host?: string, token?: string): State {
   const filePath = stateFilePath(dir ?? getAppDir(), host, token);
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(readFileSync(filePath, "utf-8")) as unknown;
-    if (typeof parsed === "object" && parsed !== null) {
-      const p = parsed as Record<string, unknown>;
-      if (
-        typeof p.version === "number" &&
-        typeof p.sessions === "object" &&
-        p.sessions !== null
-      ) {
-        const lastRecentCommitHashes = Array.isArray(p.lastRecentCommitHashes)
-          ? (p.lastRecentCommitHashes as string[]).filter((h) => typeof h === "string")
-          : undefined;
-        const out: State = {
-          version: p.version,
-          sessions: p.sessions as Record<string, SessionRecord>,
-        };
-        if (lastRecentCommitHashes !== undefined) {
-          out.lastRecentCommitHashes = lastRecentCommitHashes;
-        }
-        if ("mcp_operator" in p) {
-          const mcp = parseMcpOperator(p.mcp_operator);
-          if (mcp) out.mcp_operator = mcp;
-        }
-        if ("rate_limited_until" in p) {
-          if (typeof p.rate_limited_until === "string") {
-            out.rate_limited_until = p.rate_limited_until;
-          } else if (p.rate_limited_until === null) {
-            out.rate_limited_until = null;
-          }
-        }
-        return out;
-      }
+    parsed = JSON.parse(readFileSync(filePath, "utf-8")) as unknown;
+  } catch (err: unknown) {
+    const code = (err as NodeJS.ErrnoException)?.code;
+    if (code !== "ENOENT") {
+      // State file exists but is not valid JSON — distinguishes tampering from "never created".
+      // ENOENT stays silent: that is the normal first-run case.
+      mcpLog.warn("state_parse_failed", { path: filePath, ...describeReadFailure(err) }, false);
     }
-  } catch {
-    // missing or malformed state file — start fresh
+    return { version: 1, sessions: {} };
   }
-  return { version: 1, sessions: {} };
+  const p =
+    typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : null;
+  if (p === null || typeof p.version !== "number" || typeof p.sessions !== "object" || p.sessions === null) {
+    // Valid JSON, wrong shape. This fallback discards every dedup checkpoint and causes a full
+    // re-send, so it is the most consequential of the four to have been silent. (AIX-699)
+    mcpLog.warn("state_parse_failed", { path: filePath, reason: "invalid_shape" }, false);
+    return { version: 1, sessions: {} };
+  }
+  const lastRecentCommitHashes = Array.isArray(p.lastRecentCommitHashes)
+    ? (p.lastRecentCommitHashes as string[]).filter((h) => typeof h === "string")
+    : undefined;
+  const out: State = {
+    version: p.version,
+    sessions: p.sessions as Record<string, SessionRecord>,
+  };
+  if (lastRecentCommitHashes !== undefined) {
+    out.lastRecentCommitHashes = lastRecentCommitHashes;
+  }
+  if ("mcp_operator" in p) {
+    const mcp = parseMcpOperator(p.mcp_operator);
+    if (mcp) out.mcp_operator = mcp;
+  }
+  if ("rate_limited_until" in p) {
+    if (typeof p.rate_limited_until === "string") {
+      out.rate_limited_until = p.rate_limited_until;
+    } else if (p.rate_limited_until === null) {
+      out.rate_limited_until = null;
+    }
+  }
+  return out;
 }
 
 /** Atomic write: write to a temp file then rename over the target. */

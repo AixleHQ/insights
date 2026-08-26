@@ -50,8 +50,18 @@ module ToolEvents
       candidate_project = project
       return false if candidate_project.nil? || candidate_project.personal?
       return false if org_mismatch?(candidate_project)
+      # Don't resurrect access for a user who left the org (AIX-611): ingested events
+      # must not re-create a project membership once org membership is gone.
+      return false unless current_org_member?(candidate_project)
 
       true
+    end
+
+    def current_org_member?(candidate_project)
+      OrganizationMembership.exists?(
+        user_id: @user_id,
+        organization_id: candidate_project.organization_id
+      )
     end
 
     def project

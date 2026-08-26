@@ -193,6 +193,59 @@ RSpec.describe 'Api::V1::Projects', type: :request do
       expect(summary).not_to have_key(:state_change_count)
       expect(summary).not_to have_key(:cycle_count)
     end
+
+    context 'when the user left the org but has an orphaned project membership (AIX-611)' do
+      let(:former_member) { create(:user) }
+
+      before do
+        org_membership = create(:organization_membership, user: former_member, organization: organization, role: 'member')
+        create(:project_membership, user: former_member, project: project, role: 'member')
+        # Simulate a bypass removal path (admin panel/console) that deletes the org
+        # membership without cascading the project membership row.
+        org_membership.delete
+      end
+
+      it 'returns 404 (project no longer visible via authorized_scope)' do
+        authenticated_get "/api/v1/projects/#{project.id}", user: former_member
+
+        expect_not_found
+      end
+
+      it 'returns 404 for the nested members resource too' do
+        authenticated_get "/api/v1/projects/#{project.id}/members", user: former_member
+
+        expect_not_found
+      end
+
+      [
+        [ 'repositories', '/repositories' ],
+        [ 'connectors', '/connectors' ],
+        [ 'issues', '/issues' ],
+        [ 'audit logs', '/audit_logs' ]
+      ].each do |label, path_suffix|
+        it "returns 404 for nested #{label}" do
+          authenticated_get "/api/v1/projects/#{project.id}#{path_suffix}", user: former_member
+
+          expect_not_found
+        end
+      end
+    end
+
+    context 'when a global admin left the org (AIX-611)' do
+      let(:former_global_admin) { create(:user, :global_admin) }
+
+      before do
+        org_membership = create(:organization_membership, user: former_global_admin, organization: organization, role: 'member')
+        create(:project_membership, user: former_global_admin, project: project, role: 'member')
+        org_membership.destroy!
+      end
+
+      it 'returns 404 — global_admin does not bypass tenant leave' do
+        authenticated_get "/api/v1/projects/#{project.id}", user: former_global_admin
+
+        expect_not_found
+      end
+    end
   end
 
   describe 'POST /api/v1/projects' do

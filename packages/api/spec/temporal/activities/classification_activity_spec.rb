@@ -76,7 +76,7 @@ RSpec.describe Activities::ClassificationActivity, type: :unit do
     end
   end
 
-  describe "Path 2: pre-scanned (db90-claude) payload" do
+  describe "Path 2: pre-scanned (@aixle/insights) payload" do
     it "returns the connector's result directly without server scan" do
       params = {
         "raw_payload" => JSON.generate({
@@ -191,6 +191,58 @@ RSpec.describe Activities::ClassificationActivity, type: :unit do
       result = activity.execute(params)
 
       expect(result["risk_level"]).to eq("low")
+    end
+  end
+
+  describe "AIX-541 — structural ID fields are exempt from secret-pattern risk scoring" do
+    # Fixture catch-all proves field exclusion even when a broad pattern is present.
+    # DEFAULT_POLICY itself no longer ships this pattern (AIX-579).
+    let(:secrets_policy) do
+      {
+        "rules" => {
+          "secrets" => {
+            "enabled" => true,
+            "action" => "redact",
+            "patterns" => { "api_key" => '\b[A-Za-z0-9_-]{32,}\b' }
+          }
+        },
+        "risk_thresholds" => { "medium" => 1, "high" => 3, "critical" => 5 }
+      }
+    end
+
+    it "does not flag project_id/organization_id/user_id UUIDs as secrets (no risk inflation)" do
+      params = {
+        "raw_payload" => JSON.generate({
+          "organization_id" => "4a9c1e2b-6f3d-4e11-9c2a-7b8d5e6f9a10",
+          "user_id"         => "9d2f3a4b-5c6d-4e7f-8091-a2b3c4d5e6f7",
+          "project_id"      => "300373e4-b3de-42cf-8ffb-15e255ea1b78",
+          "tool_name"       => "claude_code",
+          "event_type"      => "chat"
+        }),
+        "policy" => secrets_policy
+      }
+
+      result = activity.execute(params)
+
+      expect(result["risk_level"]).to eq("low")
+      expect(result["detections"]).to eq([])
+      expect(result["risk_score"]).to eq(0)
+    end
+
+    it "still flags a real 32+ char secret string elsewhere in the payload" do
+      params = {
+        "raw_payload" => JSON.generate({
+          "project_id" => "300373e4-b3de-42cf-8ffb-15e255ea1b78",
+          "content"    => "leaked token: #{'a' * 40}"
+        }),
+        "policy" => secrets_policy
+      }
+
+      result = activity.execute(params)
+
+      expect(result["risk_level"]).to eq("high")
+      expect(result["detections"]).not_to be_empty
+      expect(result["detections"].first["pattern"]).to eq("api_key")
     end
   end
 

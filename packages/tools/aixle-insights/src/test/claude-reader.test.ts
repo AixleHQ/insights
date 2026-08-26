@@ -7,12 +7,15 @@ import {
   mapTranscriptTurn,
   isClaudeNoiseTranscriptTurn,
   isClaudeLocalCommandNoisePrompt,
+  classifyToolUse,
+  summarizeToolUse,
+  scrubBashCommand,
 } from "../readers/claude.js";
 import { DEFAULT_PRICING } from "../pricing.js";
 
 describe("Claude transcript reader", () => {
   it("splits a Claude transcript into individual turns with text", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "db90-claude-reader-"));
+    const dir = mkdtempSync(join(tmpdir(), "aixle-claude-reader-"));
     mkdirSync(join(dir, "proj"), { recursive: true });
     const filePath = join(dir, "proj", "session.jsonl");
 
@@ -76,7 +79,7 @@ describe("Claude transcript reader", () => {
   });
 
   it("maps a Claude transcript turn into a scannable payload with prompt text", () => {
-    const payload = mapTranscriptTurn(
+    const [payload] = mapTranscriptTurn(
       {
         sessionId: "claude-session-1",
         turnId: "claude-session-1:2",
@@ -93,6 +96,9 @@ describe("Claude transcript reader", () => {
         riskLevel: "low",
         riskScore: 0,
         riskCategories: [],
+        toolUses: [],
+        navToolCalls: 0,
+        totalToolCalls: 0,
       },
       { pricing: DEFAULT_PRICING }
     );
@@ -112,8 +118,98 @@ describe("Claude transcript reader", () => {
     });
   });
 
+  it.each([
+    {
+      name: "edit",
+      block: { type: "tool_use", id: "write-1", name: "Write", input: { file_path: "/tmp/demo.rb" } },
+      expectedEventType: "edit",
+    },
+    {
+      name: "commit",
+      block: { type: "tool_use", id: "commit-1", name: "Bash", input: { command: "git commit -m test" } },
+      expectedEventType: "commit",
+    },
+    {
+      name: "test",
+      block: { type: "tool_use", id: "test-1", name: "Bash", input: { command: "npx vitest run" } },
+      expectedEventType: "test",
+    },
+  ])("collects a $name tool use and maps a derivative payload", async ({ block, expectedEventType }) => {
+    const dir = mkdtempSync(join(tmpdir(), "aixle-claude-tool-use-"));
+    const filePath = join(dir, "session.jsonl");
+    const lines = [
+      JSON.stringify({
+        type: "user",
+        sessionId: "claude-session-tools",
+        timestamp: "2026-05-21T09:00:00.000Z",
+        message: { content: [{ type: "text", text: "Make a change" }] },
+      }),
+      JSON.stringify({
+        type: "assistant",
+        sessionId: "claude-session-tools",
+        timestamp: "2026-05-21T09:00:05.000Z",
+        message: {
+          model: "claude-sonnet-4-6",
+          usage: { input_tokens: 10, output_tokens: 4 },
+          content: [block],
+        },
+      }),
+    ].join("\n");
+    writeFileSync(filePath, `${lines}\n`, "utf-8");
+
+    const [turn] = await parseTranscriptFile(filePath);
+    expect(turn?.toolUses).toMatchObject([{ id: block.id, eventType: expectedEventType }]);
+    expect(mapTranscriptTurn(turn!)).toMatchObject([
+      { event_type: "chat" },
+      { event_type: expectedEventType },
+    ]);
+  });
+
+  it("maps non-navigation tools in encounter order and counts navigation tools on the chat", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "aixle-claude-multi-tool-"));
+    const filePath = join(dir, "session.jsonl");
+    const lines = [
+      JSON.stringify({
+        type: "user",
+        sessionId: "claude-session-multi",
+        timestamp: "2026-05-21T09:00:00.000Z",
+        message: { content: [{ type: "text", text: "Update and commit" }] },
+      }),
+      JSON.stringify({
+        type: "assistant",
+        sessionId: "claude-session-multi",
+        timestamp: "2026-05-21T09:00:05.000Z",
+        message: {
+          model: "claude-sonnet-4-6",
+          usage: { input_tokens: 10, output_tokens: 4 },
+          content: [
+            { type: "tool_use", id: "edit-1", name: "Edit", input: { file_path: "/tmp/demo.rb" } },
+            { type: "tool_use", id: "commit-1", name: "Bash", input: { command: "git commit -m test" } },
+            { type: "tool_use", id: "read-1", name: "Read", input: { file_path: "/tmp/demo.rb" } },
+          ],
+        },
+      }),
+    ].join("\n");
+    writeFileSync(filePath, `${lines}\n`, "utf-8");
+
+    const [turn] = await parseTranscriptFile(filePath);
+    expect(turn).toMatchObject({
+      navToolCalls: 1,
+      totalToolCalls: 3,
+      toolUses: [
+        { id: "edit-1", eventType: "edit" },
+        { id: "commit-1", eventType: "commit" },
+      ],
+    });
+    expect(mapTranscriptTurn(turn!).map((payload) => payload.event_type)).toEqual(["chat", "edit", "commit"]);
+    expect(mapTranscriptTurn(turn!)[0]?.metadata).toMatchObject({
+      nav_tool_calls: 1,
+      total_tool_calls: 3,
+    });
+  });
+
   it("keeps tool_result follow-ups attached to the last real prompt via promptId", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "db90-claude-reader-followup-"));
+    const dir = mkdtempSync(join(tmpdir(), "aixle-claude-reader-followup-"));
     mkdirSync(join(dir, "proj"), { recursive: true });
     const filePath = join(dir, "proj", "session.jsonl");
 
@@ -167,11 +263,14 @@ describe("Claude transcript reader", () => {
       assistantText: "Now we should add a test.",
       tokensIn: 3,
       tokensOut: 32,
+      toolUses: [],
+      navToolCalls: 1,
+      totalToolCalls: 1,
     });
   });
 
   it("does not emit turns for local-command noise prompts", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "db90-claude-noise-"));
+    const dir = mkdtempSync(join(tmpdir(), "aixle-claude-noise-"));
     mkdirSync(join(dir, "proj"), { recursive: true });
     const filePath = join(dir, "proj", "noise.jsonl");
     const sessionId = "5e606fb4-18dd-44be-903e-f6df65455cc3";
@@ -219,7 +318,7 @@ describe("Claude transcript reader", () => {
   });
 
   it("skips isMeta user lines and keeps a normal turn in the same file", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "db90-claude-meta-"));
+    const dir = mkdtempSync(join(tmpdir(), "aixle-claude-meta-"));
     mkdirSync(join(dir, "proj"), { recursive: true });
     const filePath = join(dir, "proj", "mixed.jsonl");
     const sessionId = "meta-session-1";
@@ -273,8 +372,152 @@ describe("Claude transcript reader", () => {
       riskLevel: "low" as const,
       riskScore: 0,
       riskCategories: [] as string[],
+      toolUses: [],
+      navToolCalls: 0,
+      totalToolCalls: 0,
     };
     expect(isClaudeNoiseTranscriptTurn(turn)).toBe(false);
     expect(isClaudeLocalCommandNoisePrompt(turn.promptText)).toBe(false);
+  });
+});
+
+describe("classifyToolUse", () => {
+  it("maps Edit/Write/MultiEdit/NotebookEdit to edit", () => {
+    for (const name of ["Edit", "Write", "MultiEdit", "NotebookEdit"]) {
+      expect(classifyToolUse({ name })).toBe("edit");
+    }
+  });
+
+  it("maps Bash git commit to commit", () => {
+    expect(classifyToolUse({ name: "Bash", input: { command: "git commit -m 'x'" } })).toBe("commit");
+    expect(classifyToolUse({ name: "Bash", input: { command: "git commit --amend" } })).toBe("commit");
+    expect(classifyToolUse({ name: "Bash", input: { command: "git commit" } })).toBe("commit");
+  });
+
+  it("does not treat git commit-tree as a commit", () => {
+    expect(classifyToolUse({ name: "Bash", input: { command: "git commit-tree abc" } })).toBe("tool_use");
+  });
+
+  it("maps Bash test runners to test", () => {
+    expect(classifyToolUse({ name: "Bash", input: { command: "bundle exec rspec spec/foo_spec.rb" } })).toBe("test");
+    expect(classifyToolUse({ name: "Bash", input: { command: "npx vitest run" } })).toBe("test");
+  });
+
+  it("drops Read/Grep/Glob/LS", () => {
+    for (const name of ["Read", "Grep", "Glob", "LS"]) {
+      expect(classifyToolUse({ name })).toBeNull();
+    }
+  });
+
+  it("maps other tools to tool_use", () => {
+    expect(classifyToolUse({ name: "Task", input: { subagent_type: "Explore" } })).toBe("tool_use");
+    expect(classifyToolUse({ name: "Bash", input: { command: "ls -la" } })).toBe("tool_use");
+  });
+});
+
+describe("summarizeToolUse", () => {
+  it("uses file_path for edits and truncates to 256", () => {
+    const s = summarizeToolUse({ name: "Edit", input: { file_path: "/a/b.rb" } });
+    expect(s).toContain("/a/b.rb");
+    expect(s.length).toBeLessThanOrEqual(256);
+  });
+
+  it("summarizes Bash command without exceeding 256", () => {
+    const s = summarizeToolUse({ name: "Bash", input: { command: "git commit -m " + "x".repeat(400) } });
+    expect(s.startsWith("Bash:")).toBe(true);
+    expect(s.length).toBeLessThanOrEqual(256);
+  });
+
+  it("redacts credentials in Bash command summaries before egress", () => {
+    const s = summarizeToolUse({
+      name: "Bash",
+      input: { command: "curl -H 'Authorization: Bearer secret-token-xyz' https://api.example.com" },
+    });
+    expect(s).not.toContain("secret-token-xyz");
+    expect(s).toContain("[REDACTED]");
+  });
+});
+
+describe("scrubBashCommand", () => {
+  it("redacts Authorization Bearer header", () => {
+    const out = scrubBashCommand("curl -H 'Authorization: Bearer sk-abc123' https://api.example.com");
+    expect(out).not.toContain("sk-abc123");
+    expect(out).toContain("Bearer [REDACTED]");
+  });
+
+  it("redacts Authorization Basic header", () => {
+    const out = scrubBashCommand("curl -H 'Authorization: Basic dXNlcjpwYXNz'");
+    expect(out).not.toContain("dXNlcjpwYXNz");
+    expect(out).toContain("Basic [REDACTED]");
+  });
+
+  it("redacts inline env-var secret assignments", () => {
+    expect(scrubBashCommand("AWS_SECRET_ACCESS_KEY=s3cr3t aws s3 ls")).not.toContain("s3cr3t");
+    expect(scrubBashCommand("GITHUB_TOKEN=ghp_abc123 gh pr create")).not.toContain("ghp_abc123");
+    expect(scrubBashCommand("DB_PASSWORD=hunter2 rails db:migrate")).not.toContain("hunter2");
+    expect(scrubBashCommand("db_password=hunter2 rails db:migrate")).not.toContain("hunter2");
+    expect(scrubBashCommand("api_key=xyz npm publish")).not.toContain("xyz");
+    expect(scrubBashCommand("FOO_KEY=bar cmd")).not.toContain("bar");
+  });
+
+  it("does not redact benign env assignments that merely contain key/pass letters", () => {
+    expect(scrubBashCommand("monkey=1 echo hi")).toBe("monkey=1 echo hi");
+    expect(scrubBashCommand("keyboard=layout setxkbmap")).toBe("keyboard=layout setxkbmap");
+    expect(scrubBashCommand("path=/tmp/foo cmd")).toBe("path=/tmp/foo cmd");
+  });
+
+  it("redacts --password= and --token= flags", () => {
+    expect(scrubBashCommand("some-cli --password=supersecret --user=alice")).not.toContain("supersecret");
+    expect(scrubBashCommand("tool --token=tok_live_xyz")).not.toContain("tok_live_xyz");
+    expect(scrubBashCommand("tool --api-key=key-123")).not.toContain("key-123");
+  });
+
+  it("redacts space-separated secret flags (--flag value)", () => {
+    expect(scrubBashCommand("tool --token hunter2")).not.toContain("hunter2");
+    expect(scrubBashCommand("some-cli --password supersecret --user alice")).not.toContain("supersecret");
+    expect(scrubBashCommand("tool --api-key key-123")).not.toContain("key-123");
+    expect(scrubBashCommand("tool --client-secret shhh")).not.toContain("shhh");
+  });
+
+  it("redacts quoted secret-flag values including spaces inside quotes", () => {
+    expect(scrubBashCommand('tool --token="secret value"')).not.toContain("secret value");
+    expect(scrubBashCommand("tool --token 'secret value'")).not.toContain("secret value");
+    expect(scrubBashCommand('tool --password="a b c"')).not.toContain("a b c");
+  });
+
+  it("redacts quoted env-var secret assignments including spaces inside quotes", () => {
+    expect(scrubBashCommand('TOKEN="secret value" cmd')).not.toContain("secret value");
+    expect(scrubBashCommand("DB_PASSWORD='hunter 2' rails db:migrate")).not.toContain("hunter 2");
+  });
+
+  it("redacts --profile flag (customer identifier)", () => {
+    const out = scrubBashCommand("aws s3 sync s3://bucket/ . --profile customer-prod");
+    expect(out).not.toContain("customer-prod");
+    expect(out).toContain("--profile [REDACTED]");
+  });
+
+  it("redacts --secret-access-key and --access-key-id flags", () => {
+    expect(scrubBashCommand("aws configure --secret-access-key AKIAXYZ")).not.toContain("AKIAXYZ");
+    expect(scrubBashCommand("aws configure --access-key-id AKIA123")).not.toContain("AKIA123");
+  });
+
+  it("redacts curl | sh / curl | bash patterns", () => {
+    const out = scrubBashCommand("curl https://install.example.com/script.sh | sh");
+    expect(out).toContain("[SHELL REDACTED]");
+    expect(out).not.toContain("| sh");
+  });
+
+  it("leaves safe commands unchanged", () => {
+    expect(scrubBashCommand("git commit -m 'fix typo'")).toBe("git commit -m 'fix typo'");
+    expect(scrubBashCommand("bundle exec rspec spec/")).toBe("bundle exec rspec spec/");
+    expect(scrubBashCommand("npm run build")).toBe("npm run build");
+  });
+
+  it("handles multiple secrets in the same command", () => {
+    const cmd = "AWS_SECRET_ACCESS_KEY=abc123 curl -H 'Authorization: Bearer bearer-secret' --token=tok-secret https://x.com";
+    const out = scrubBashCommand(cmd);
+    expect(out).not.toContain("abc123");
+    expect(out).not.toContain("bearer-secret");
+    expect(out).not.toContain("tok-secret");
   });
 });

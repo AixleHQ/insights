@@ -57,4 +57,28 @@ describe("CostTrendChart", () => {
       "inactive"
     );
   });
+
+  it("omits the project scope prefix when no projects list is supplied", () => {
+    render(<CostTrendChart data={[]} />);
+
+    expect(screen.getByText(/^Total: /)).toBeInTheDocument();
+  });
+
+  it("shows the org-wide scope label when no project is selected", () => {
+    render(<CostTrendChart data={[]} projects={[{ id: "p1", name: "Aixle Insights" }]} />);
+
+    expect(screen.getByText(/^Cost data across your organization · Total: /)).toBeInTheDocument();
+  });
+
+  it("shows the selected project's name in the scope label", () => {
+    render(
+      <CostTrendChart
+        data={[]}
+        projectId="p1"
+        projects={[{ id: "p1", name: "Aixle Insights" }]}
+      />
+    );
+
+    expect(screen.getByText(/^Cost data for Aixle Insights · Total: /)).toBeInTheDocument();
+  });
 });

@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 # JWT authentication helpers for specs
-# The actual test middleware is in config/initializers/test_auth_middleware.rb
+# The actual test middleware is in config/initializers/test_auth_middleware.rb.
+# It is gated on Rails.env.test? AND ENV["ALLOW_TEST_AUTH_MIDDLEWARE"] (set by rails_helper.rb).
 # This file provides helper methods for generating test tokens
 
 module JwtAuthStub

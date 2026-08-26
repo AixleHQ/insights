@@ -94,7 +94,7 @@ namespace :db90 do
       # zsh: quote the task or brackets are treated as globs — use quotes below.
 
       rails 'db90:cleanup_demo_projects[dry_run]'                         # list only
-      rails db90:cleanup_demo_projects                                    # acme-corp, delete
+      rails db90:cleanup_demo_projects                                    # dualboot-partners, delete
       rails 'db90:cleanup_demo_projects[my-org-slug]'                     # delete for org slug
       rails 'db90:cleanup_demo_projects[my-org-slug,dry_run]'
 
@@ -112,7 +112,7 @@ namespace :db90 do
     end
 
     org_slug = first
-    org_slug = "acme-corp" if org_slug.blank? || org_slug.casecmp("dry_run").zero?
+    org_slug = "dualboot-partners" if org_slug.blank? || org_slug.casecmp("dry_run").zero?
 
     org = Organization.find_by(slug: org_slug)
     unless org
@@ -179,7 +179,7 @@ namespace :db90 do
     end
 
     org_slug = first
-    org_slug = "acme-corp" if org_slug.blank? || org_slug.casecmp("dry_run").zero?
+    org_slug = "dualboot-partners" if org_slug.blank? || org_slug.casecmp("dry_run").zero?
 
     org = Organization.find_by(slug: org_slug)
     unless org
@@ -218,7 +218,7 @@ namespace :db90 do
       rails 'db90:cleanup_claude_noise_events[my-org-slug]'
       rails 'db90:cleanup_claude_noise_events[my-org-slug,dry_run]'
 
-    After delete, MCP checkpoints in ~/.db90-mcp/state-*.json may still block re-send of
+    After delete, MCP checkpoints in ~/.aixle-insights/state-*.json may still block re-send of
     valid turns for the same session; clear claude_code:{sessionId}:{turnIndex} keys only if
     you need to re-ingest legitimate turns (not required for noise cleanup).
 
@@ -329,7 +329,7 @@ namespace :db90 do
     end
 
     org_slug = first
-    org_slug = "acme-corp" if org_slug.blank? || org_slug.casecmp("dry_run").zero?
+    org_slug = "dualboot-partners" if org_slug.blank? || org_slug.casecmp("dry_run").zero?
 
     org = Organization.find_by(slug: org_slug)
     unless org
@@ -413,7 +413,7 @@ namespace :db90 do
     end
 
     org_slug = first
-    org_slug = "acme-corp" if org_slug.blank? || org_slug.casecmp("dry_run").zero?
+    org_slug = "dualboot-partners" if org_slug.blank? || org_slug.casecmp("dry_run").zero?
 
     org = Organization.find_by(slug: org_slug)
     unless org

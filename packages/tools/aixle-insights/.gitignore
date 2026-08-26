@@ -4,3 +4,19 @@ dist/
 
 # npm pack smoke-test artifacts (any version)
 aixle-insights-*.tgz
+
+# Local runtime artifacts — never commit.
+# `state-<hostname>-<token-hash>.json` embeds Claude/Cursor session UUIDs and
+# `credentials.json` holds a bearer token. Both are written into this directory
+# when the CLI runs from a source checkout.
+#
+# These rules live here, not in the repo-root .gitignore, so a folder rename
+# cannot orphan them. That is exactly how state-localhost-523d45af.json got
+# committed: the root rules still pointed at /packages/tools/db90-mcp/ after
+# the db90-mcp -> db90-telemetry-mcp -> aixle-insights renames. (AIX-559)
+#
+# Anchored with a leading `/`: the CLI only ever writes these at the package
+# root, and unanchored patterns would silently make a future
+# src/test/fixtures/state-*.json uncommittable.
+/credentials.json
+/state-*.json
