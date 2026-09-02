@@ -6,7 +6,8 @@ hero:
   text: AI tool analytics for engineering teams
   tagline: Track usage, cost, and risk across Claude, ChatGPT, Copilot, and 10+ other tools.
   image:
-    src: /insights/dashboard.png
+    # Path is relative to site root; VitePress prepends `base` (/insights/)
+    src: /dashboard.png
     alt: Aixle Insights dashboard
   actions:
     - theme: brand
