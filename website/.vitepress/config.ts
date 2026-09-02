@@ -13,6 +13,7 @@ export default defineConfig({
       { text: 'Quickstart', link: '/quickstart' },
       { text: 'Guide', link: '/guide/connectors' },
       { text: 'Reference', link: '/reference/architecture' },
+      { text: 'App', link: 'https://insights.aixle.com' },
       { text: 'GitHub', link: 'https://github.com/AixleHQ/insights' },
     ],
 
