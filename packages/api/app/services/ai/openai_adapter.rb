@@ -96,6 +96,8 @@ module Ai
         case response.code.to_i
         when 200..299
           body
+        # Auth and rate-limit bodies may contain credential material. Discard them at
+        # the adapter boundary so future callers cannot accidentally expose them.
         when 401
           raise AuthenticationError.new("Invalid API key", status: 401, provider: "openai")
         when 429

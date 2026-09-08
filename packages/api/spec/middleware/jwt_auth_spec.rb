@@ -430,4 +430,122 @@ RSpec.describe JwtAuth do
       end
     end
   end
+
+  # AIX-370 — PII in logs, on the hottest path in the application.
+  #
+  # These must live here rather than in a request spec: TestJwtAuthMiddleware runs at stack
+  # index 0 and injects env["jwt.claims"], so JwtAuth#call short-circuits before #authenticate
+  # is ever reached. A request spec therefore cannot exercise this code at all.
+  #
+  # They also stub :info and :warn, NOT :error. Every identity-bearing line in this middleware
+  # is at info/warn; a spec copying the :error pattern used elsewhere in this ticket would
+  # capture an empty array and pass without asserting anything.
+  describe 'log hygiene (AIX-370)' do
+    let(:logged) { [] }
+
+    before do
+      allow(Rails.logger).to receive(:info) { |message| logged << message }
+      allow(Rails.logger).to receive(:warn) { |message| logged << message }
+    end
+
+    def logged_text = logged.join("\n")
+
+    context 'on the successful Keycloak auth path' do
+      let(:private_key) { OpenSSL::PKey::RSA.generate(2048) }
+      let(:public_key) { private_key.public_key }
+      let(:kid) { 'test-key-id' }
+      let(:pii_email) { 'jwt-pii-canary@example.com' }
+
+      let(:claims) do
+        {
+          'sub' => 'keycloak-sub-CANARY-77f1',
+          'email' => pii_email,
+          'name' => 'JWT PII Canary',
+          'iss' => 'http://localhost:8080/realms/db90',
+          'aud' => 'db90-web',
+          'exp' => 1.hour.from_now.to_i,
+          'iat' => Time.now.to_i
+        }
+      end
+
+      let(:token) { JWT.encode(claims, private_key, 'RS256', { kid: kid }) }
+
+      let(:jwks_response) do
+        {
+          'keys' => [
+            {
+              'kid' => kid,
+              'kty' => 'RSA',
+              'n' => Base64.urlsafe_encode64(public_key.n.to_s(2)),
+              'e' => Base64.urlsafe_encode64(public_key.e.to_s(2))
+            }
+          ]
+        }
+      end
+
+      before do
+        allow(Rails.cache).to receive(:fetch) do |key, **_options, &block|
+          key == 'keycloak_jwks' ? jwks_response : block&.call
+        end
+      end
+
+      around do |example|
+        original_issuer = ENV['KEYCLOAK_ISSUER']
+        original_audience = ENV['KEYCLOAK_AUDIENCE']
+        ENV['KEYCLOAK_ISSUER'] = 'http://localhost:8080/realms/db90'
+        ENV['KEYCLOAK_AUDIENCE'] = 'db90-web'
+
+        example.run
+
+        ENV['KEYCLOAK_ISSUER'] = original_issuer
+        ENV['KEYCLOAK_AUDIENCE'] = original_audience
+      end
+
+      it 'authenticates without writing the email or sub to the log' do
+        # Fresh instance: the memoized middleware is built before `around` sets ENV.
+        fresh_middleware = described_class.new(app)
+        env = Rack::MockRequest.env_for('/api/v1/users', 'HTTP_AUTHORIZATION' => "Bearer #{token}")
+
+        status, _headers, _body = fresh_middleware.call(env)
+
+        # Auth must still succeed — otherwise the log could be clean simply because the
+        # request was rejected before reaching the code under test.
+        expect(status).to eq(200)
+        expect(env['jwt.claims']['email']).to eq(pii_email)
+
+        expect(logged_text).not_to include(pii_email)
+        expect(logged_text).not_to include('keycloak-sub-CANARY-77f1')
+      end
+
+      it 'records the sanitised log output as AC2-hot evidence' do
+        fresh_middleware = described_class.new(app)
+        env = Rack::MockRequest.env_for('/api/v1/users', 'HTTP_AUTHORIZATION' => "Bearer #{token}")
+
+        fresh_middleware.call(env)
+
+      end
+    end
+
+    context 'on the impersonation path' do
+      let(:admin) { create(:user, :global_admin) }
+      let(:target) { create(:user) }
+      let(:token) { ImpersonationService.generate_token(admin_user: admin, target_user: target) }
+
+      after do
+        jti = JWT.decode(token, nil, false).first['jti']
+        REDIS.del("impersonation:jti:#{jti}") if jti
+      end
+
+      it 'records the impersonator id but not the impersonated user\'s email' do
+        env = Rack::MockRequest.env_for('/api/v1/users', 'HTTP_AUTHORIZATION' => "Bearer #{token}")
+
+        status, _headers, _body = middleware.call(env)
+
+        expect(status).to eq(200)
+        expect(logged_text).to include("impersonator_id=#{admin.id}")
+        expect(logged_text).not_to include(target.email)
+        expect(logged_text).not_to include(admin.email)
+      end
+    end
+  end
 end

@@ -8,6 +8,12 @@ Rollbar.configure do |config|
     "ActionController::RoutingError" => "ignore"
   )
 
+  # Domain-specific secrets on top of the gem's built-in scrub_fields/scrub_headers
+  # (see rollbar/configuration.rb defaults). Explicit here so coverage doesn't
+  # silently depend on gem-default drift.
+  config.scrub_fields |= %i[keycloak_sub webhook_secret refresh_token api_token client_secret]
+  config.scrub_headers |= [ "X-Api-Key" ]
+
   # AIX-716. :webhook_token is the sole authenticator for the JWT-excluded
   # OpenRouter trace webhook, so Rollbar must treat it as a credential.
   #

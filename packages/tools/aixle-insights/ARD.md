@@ -249,7 +249,7 @@ contract. On the dev side `eslint@10` needs `^20.19.0 || ^22.13.0 || >=24`, so
 Node 22.0–22.12 can install the package but not run the lint.
 
 **Out of scope, tracked elsewhere:** Dependabot, CodeQL and secret scanning are
-[AIX-433](AIX-433)
+AIX-433
 (public-repo prerequisite). `publishConfig.provenance` stays explicitly `false`,
 guarded in `release-cli.yml`, and flips to `true` in the same PR that makes the
 repository public.

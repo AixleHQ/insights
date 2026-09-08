@@ -110,5 +110,19 @@ RSpec.describe 'Api::V1::Webhooks', type: :request do
         expect(response).to have_http_status(:ok)
       end
     end
+
+    context 'when processing raises an unexpected error after signature verification passes' do
+      it 'does not echo internal exception text to the client' do
+        sensitive_message = 'PG::UniqueViolation: duplicate key value violates constraint on table internal_audit_log_9f8a'
+        allow(WebhookDelivery).to receive(:create!).and_raise(StandardError, sensitive_message)
+        expect(Rails.logger).to receive(:error).with(a_string_including(sensitive_message))
+
+        post_webhook(provider: 'github', connector_id: connector.id, signature_headers: github_signature_headers(body, secret))
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(JSON.parse(response.body)).to eq({ 'error' => 'Processing failed' })
+        expect(response.body).not_to include(sensitive_message)
+      end
+    end
   end
 end

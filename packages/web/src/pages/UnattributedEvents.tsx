@@ -67,8 +67,7 @@ import { RiskBadge } from "@/components/dashboard";
 import { normalizeRiskLevel } from "@/lib/riskLevel";
 import { formatCost } from "@/lib/formatters";
 import { AppRoutes } from "@/lib/routes";
-import { humanizeToolName } from "@/lib/utils";
-import { formatDistanceToNow } from "@/lib/utils";
+import { humanizeToolName, cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "sonner";
 import {
@@ -84,8 +83,11 @@ import {
 } from "@/components/ui/tooltip";
 import { UnattributedEventsIllustration } from "@/components/ui/illustrations";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { EventTimeCell } from "@/components/events/EventTimeCell";
 
 type UnattributedSortField = "tool_name" | "risk_level" | "cost_usd" | "created_at" | "suggested_user" | "confidence";
+
+const headClassName = "text-muted-foreground type-caption font-medium";
 
 const riskLevelOrder: Record<string, number> = {
   critical: 4,
@@ -154,7 +156,7 @@ function memberAssigneeId(m: {
 
 function EventSkeleton({ showAdminColumns }: { showAdminColumns: boolean }) {
   return (
-    <TableRow>
+    <TableRow className="skeleton-block">
       {showAdminColumns && (
         <TableCell>
           <Skeleton className="h-4 w-4" />
@@ -170,16 +172,16 @@ function EventSkeleton({ showAdminColumns }: { showAdminColumns: boolean }) {
         <Skeleton className="h-5 w-16" />
       </TableCell>
       <TableCell>
-        <Skeleton className="h-4 w-16" />
-      </TableCell>
-      <TableCell>
         <Skeleton className="h-4 w-32" />
       </TableCell>
       <TableCell>
         <Skeleton className="h-4 w-16" />
       </TableCell>
       <TableCell>
-        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-4 w-16" />
+      </TableCell>
+      <TableCell>
+        <Skeleton className="h-4 w-14" />
       </TableCell>
       {showAdminColumns && (
         <TableCell>
@@ -632,12 +634,12 @@ export function UnattributedEvents({
       )}
 
       {(isLoading || filteredEvents.length > 0) && (
-        <div className="rounded-md border overflow-x-auto">
-          <Table className="min-w-[750px]">
+        <div className="overflow-x-auto">
+          <Table className="min-w-[800px]">
             <TableHeader>
-              <TableRow>
+              <TableRow className="border-b border-border/50">
                 {canManageAttribution && (
-                  <TableHead className="w-10">
+                  <TableHead className={cn("w-10", headClassName)}>
                     <Checkbox
                       checked={allFilteredSelected}
                       onCheckedChange={handleSelectAll}
@@ -646,7 +648,7 @@ export function UnattributedEvents({
                     />
                   </TableHead>
                 )}
-                <TableHead className="w-[180px]">
+                <TableHead className={cn("w-[180px]", headClassName)}>
                   <SortButton
                     field="tool_name"
                     currentField={sortField}
@@ -656,8 +658,10 @@ export function UnattributedEvents({
                     Tool
                   </SortButton>
                 </TableHead>
-                <TableHead className="hidden sm:table-cell w-[120px]">Event Type</TableHead>
-                <TableHead className="w-[90px]">
+                <TableHead className={cn("hidden sm:table-cell w-[120px]", headClassName)}>
+                  Type
+                </TableHead>
+                <TableHead className={cn("w-[110px]", headClassName)}>
                   <SortButton
                     field="risk_level"
                     currentField={sortField}
@@ -667,17 +671,7 @@ export function UnattributedEvents({
                     Risk
                   </SortButton>
                 </TableHead>
-                <TableHead className="hidden sm:table-cell w-[100px]">
-                  <SortButton
-                    field="cost_usd"
-                    currentField={sortField}
-                    currentDirection={sortDirection}
-                    onSort={handleSort}
-                  >
-                    Cost
-                  </SortButton>
-                </TableHead>
-                <TableHead className="hidden md:table-cell w-[160px]">
+                <TableHead className={cn("hidden md:table-cell w-[220px]", headClassName)}>
                   <SortButton
                     field="suggested_user"
                     currentField={sortField}
@@ -687,7 +681,7 @@ export function UnattributedEvents({
                     Suggested User
                   </SortButton>
                 </TableHead>
-                <TableHead className="hidden md:table-cell w-[120px]">
+                <TableHead className={cn("hidden md:table-cell w-[120px]", headClassName)}>
                   <SortButton
                     field="confidence"
                     currentField={sortField}
@@ -697,7 +691,7 @@ export function UnattributedEvents({
                     Confidence
                   </SortButton>
                 </TableHead>
-                <TableHead className="w-[120px]">
+                <TableHead className={cn("w-[100px]", headClassName)}>
                   <SortButton
                     field="created_at"
                     currentField={sortField}
@@ -707,8 +701,20 @@ export function UnattributedEvents({
                     Time
                   </SortButton>
                 </TableHead>
+                <TableHead className={cn("hidden sm:table-cell w-[90px] text-right", headClassName)}>
+                  <SortButton
+                    field="cost_usd"
+                    currentField={sortField}
+                    currentDirection={sortDirection}
+                    onSort={handleSort}
+                  >
+                    Cost
+                  </SortButton>
+                </TableHead>
                 {canManageAttribution && (
-                  <TableHead className="w-[160px] text-right">Actions</TableHead>
+                  <TableHead className={cn("w-[160px] text-right", headClassName)}>
+                    Actions
+                  </TableHead>
                 )}
               </TableRow>
             </TableHeader>
@@ -725,7 +731,11 @@ export function UnattributedEvents({
                     <TableRow
                       key={event.id}
                       data-state={selectedIds.has(event.id) ? "selected" : undefined}
-                      className={onEventClick ? "hover:bg-muted/50 transition-colors cursor-pointer" : "hover:bg-muted/50 transition-colors"}
+                      className={cn(
+                        "group border-b border-border/30 transition-colors hover:bg-muted/30",
+                        onEventClick && "cursor-pointer",
+                        selectedIds.has(event.id) && "bg-muted/50"
+                      )}
                       onClick={() => onEventClick?.(event.id)}
                     >
                       {canManageAttribution && (
@@ -739,26 +749,29 @@ export function UnattributedEvents({
                       )}
                       <TableCell>
                         <div>
-                          <p className="font-medium text-sm">{humanizeToolName(event.toolName)}</p>
+                          <p className="type-label font-semibold text-foreground">
+                            {humanizeToolName(event.toolName)}
+                          </p>
                           {event.model && (
-                            <p className="text-xs text-muted-foreground">{event.model}</p>
+                            <p className="type-caption text-muted-foreground">{event.model}</p>
                           )}
                         </div>
                       </TableCell>
                       <TableCell className="hidden sm:table-cell">
-                        <EventTypeBadge type={event.eventType} />
+                        {event.eventType ? (
+                          <EventTypeBadge type={event.eventType} />
+                        ) : (
+                          <span className="type-caption text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <RiskBadge level={normalizeRiskLevel(event.riskLevel)} />
-                      </TableCell>
-                      <TableCell className="hidden sm:table-cell">
-                        <span className="text-sm">{formatCost(event.costUsd ?? 0)}</span>
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
                         {suggested ? (
                           <UserAvatar name={suggested.name} email={suggested.email} avatarUrl={suggested.avatarUrl} suggested />
                         ) : (
-                          <span className="text-sm text-muted-foreground">—</span>
+                          <span className="type-caption text-muted-foreground">—</span>
                         )}
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
@@ -767,7 +780,7 @@ export function UnattributedEvents({
                             <TooltipTrigger asChild>
                               <div className="flex items-center gap-2 w-fit cursor-default">
                                 <CircleProgress value={Number(event.correlationConfidence)} size={14} className="text-foreground" />
-                                <span className="text-sm">
+                                <span className="type-caption tabular-nums text-muted-foreground">
                                   {Math.round(Number(event.correlationConfidence) * 100)}%
                                 </span>
                               </div>
@@ -779,18 +792,26 @@ export function UnattributedEvents({
                             )}
                           </Tooltip>
                         ) : (
-                          <span className="text-sm text-muted-foreground">—</span>
+                          <span className="type-caption text-muted-foreground">—</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-sm">
-                        {formatDistanceToNow(event.occurredAt || event.createdAt)}
+                      <TableCell>
+                        <EventTimeCell
+                          toolName={event.toolName}
+                          occurredAt={event.occurredAt || event.createdAt}
+                        />
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell text-right">
+                        <span className="font-mono-display type-label font-semibold tabular-nums text-foreground">
+                          {formatCost(event.costUsd ?? 0)}
+                        </span>
                       </TableCell>
                       {canManageAttribution && (
                         <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                           {suggested ? (
                             <div className="flex items-center rounded-md border bg-background shadow-xs dark:bg-input/30 dark:border-input overflow-hidden w-fit ml-auto">
                               <button
-                                className="flex items-center gap-2 px-3 h-8 text-sm font-medium hover:bg-accent dark:hover:bg-input/50 transition-colors disabled:opacity-50"
+                                className="flex items-center gap-2 px-3 h-8 type-label font-medium hover:bg-accent dark:hover:bg-input/50 transition-colors disabled:opacity-50"
                                 onClick={() => handleQuickAssign(event.id, suggested.id, suggested.name || suggested.email)}
                                 disabled={attributeEvent.isPending}
                               >
@@ -817,7 +838,7 @@ export function UnattributedEvents({
                           ) : (
                             <div className="flex items-center rounded-md border bg-background shadow-xs dark:bg-input/30 dark:border-input overflow-hidden w-fit ml-auto">
                               <button
-                                className="flex items-center gap-2 px-3 h-8 text-sm font-medium hover:bg-accent dark:hover:bg-input/50 transition-colors"
+                                className="flex items-center gap-2 px-3 h-8 type-label font-medium hover:bg-accent dark:hover:bg-input/50 transition-colors"
                                 onClick={() => openAssignDialog(event.id)}
                               >
                                 <User className="size-3.5 text-muted-foreground" />

@@ -17,7 +17,12 @@ import type { ChartConfig } from "@/components/ui/chart";
 import { ChartSkeleton } from "@/components/ui/skeletons";
 import { ErrorState } from "@/components/ui/error-state";
 import { RangeSegmentedControl } from "@/components/dashboard/RangeSegmentedControl";
-import { formatDateLabel, projectScopeLabel, sliceCostTrendWindow } from "@/lib/dashboardUtils";
+import {
+  chartTickInterval,
+  formatDateLabel,
+  projectScopeLabel,
+  sliceCostTrendWindow,
+} from "@/lib/dashboardUtils";
 import { formatCost } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
@@ -83,7 +88,8 @@ export function CostTrendChart({
   const totalCost = filteredData.reduce((sum, item) => sum + item.cost, 0);
   const avgCost = filteredData.length > 0 ? totalCost / filteredData.length : 0;
   const avgLabel = allTime ? `${formatCost(avgCost)}/mo` : `${formatCost(avgCost)}/day`;
-  const showEveryTick = formattedData.length <= 31;
+  const tickInterval = chartTickInterval(formattedData.length);
+  const showEveryTick = tickInterval === 0;
   const scopeLabel = projects ? projectScopeLabel(projectId, projects, "Cost data") : undefined;
 
   return (
@@ -132,7 +138,8 @@ export function CostTrendChart({
                   tickLine={false}
                   axisLine={false}
                   tickMargin={8}
-                  interval={showEveryTick ? 0 : "preserveStartEnd"}
+                  interval={tickInterval}
+                  minTickGap={8}
                   padding={showEveryTick ? { left: 0, right: 12 } : undefined}
                   className="text-xs text-muted-foreground"
                   tick={{ fill: "currentColor", fontSize: 11 }}

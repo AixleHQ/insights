@@ -5,6 +5,32 @@ All notable changes to Aixle Insights are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-09-03
+
+Third minor release after 1.2.0. A UI-focused batch from `develop`: the Events
+table and Activity Heatmap aligned to Figma, team invite/invitations with dark
+theme and route guards, plus a logging-hygiene pass that stops leaking PII and
+upstream error text into logs and Rollbar. No database migrations.
+
+### Added
+- Align the Events table and toolbar with Figma, including filter layout and
+  Not Assigned table typography (`AIX-115`).
+- Activity Heatmap dashboard component with achromatic palette and accurate
+  event counts (`AIX-130`).
+- Team invite and invitations screens with dark-theme support, owner-gated
+  routes, and route guard tests (`AIX-185`).
+
+### Changed
+- Logging hygiene: stop echoing upstream AI provider and internal exception
+  text to clients, drop user identity/email from auth logs, and sync
+  `filter_parameters` with Rollbar `scrub_fields` (`AIX-370`).
+
+### Fixed
+- Stop the Cost Trend 30-day labels from overlapping (`AIX-114`).
+- Add missing command palette navigation items and icons (`AIX-133`).
+- Rename the export filename prefix from `db90-` to `aixle-insights-`
+  (`AIX-427`).
+
 ## [1.2.0] - 2026-08-26
 
 Second minor release after 1.1.0. Adds the member personal dashboard with
@@ -418,6 +444,8 @@ tags cut from the same `release/1.0.0` branch.
 ### Added
 - Initial Aixle Insights platform release cut from `develop` for production infrastructure validation.
 
+[1.3.0]: https://github.com/AixleHQ/insights/releases/tag/v1.3.0
+[1.2.0]: https://github.com/AixleHQ/insights/releases/tag/v1.2.0
 [1.1.0]: https://github.com/AixleHQ/insights/releases/tag/v1.1.0
 [1.0.0]: https://github.com/AixleHQ/insights/releases/tag/v1.0.0
 [1.0.0-alpha.9]: https://github.com/AixleHQ/insights/releases/tag/v1.0.0-alpha.9

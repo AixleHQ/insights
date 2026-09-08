@@ -27,8 +27,8 @@ module Api
           }
         }, status: :accepted
       rescue StandardError => e
-        Rails.logger.error "[Telemetry] Ingest failed: #{e.message}"
-        render json: { error: "Processing failed", message: e.message }, status: :unprocessable_content
+        Rails.logger.error "[Telemetry] Ingest failed: #{e.class.name} #{e.message}"
+        render json: { error: "Processing failed" }, status: :unprocessable_content
       end
 
       # POST /api/v1/organizations/:organization_id/telemetry/batch
@@ -145,7 +145,10 @@ module Api
 
         { index: index, accepted: true, workflow_id: result[:workflow_id] }
       rescue StandardError => e
-        { index: index, accepted: false, error: e.message }
+        # Per-event failures are returned to the client, so the reason stays generic here;
+        # the exception detail is only ever written to the server log.
+        Rails.logger.error "[Telemetry] Batch event #{index} failed: #{e.class.name} #{e.message}"
+        { index: index, accepted: false, error: "Processing failed" }
       end
 
       def max_batch_size

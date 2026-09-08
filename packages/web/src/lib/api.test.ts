@@ -40,3 +40,43 @@ describe("getApiErrorMessage", () => {
     expect(getApiErrorMessage(new Error("boom"), "fallback")).toBe("fallback");
   });
 });
+
+// AIX-370 A09-6 — the frontend half of the error-echo fix.
+//
+// The ticket lists A09-6 as riding on A09-1: once the backend stops sending provider
+// text, there is nothing for the UI to display. That is true, but it was only ever an
+// argument. These pin it.
+describe("AI gateway errors are not amplified by the client (AIX-370 A09-6)", () => {
+  const PROVIDER_HOST = "api-internal-7f3a.provider.example";
+  const PROVIDER_REQUEST_ID = "req_canary_9f8a1b2c3d4e5f60";
+
+  it("shows the backend's generic message for a real AI gateway auth failure", () => {
+    // Exactly what the API now returns — see ai_gateway_controller#render_ai_error.
+    const error = new ApiError("Authentication with the AI provider failed.", 401, {
+      error: "Authentication Failed",
+      message: "Authentication with the AI provider failed.",
+    });
+
+    expect(getApiErrorMessage(error, "fallback")).toBe(
+      "Authentication with the AI provider failed.",
+    );
+  });
+
+  it("reads only known fields, so extra body keys cannot reach the UI", () => {
+    // Defence in depth: if a future backend change ever attached provider detail as a
+    // sibling field, the client must still surface only `message`. This is what stops
+    // the frontend re-opening A09-6 independently of the backend.
+    const error = new ApiError("Authentication with the AI provider failed.", 401, {
+      error: "Authentication Failed",
+      message: "Authentication with the AI provider failed.",
+      upstream_host: PROVIDER_HOST,
+      request_id: PROVIDER_REQUEST_ID,
+    });
+
+    const shown = getApiErrorMessage(error, "fallback");
+
+    expect(shown).toBe("Authentication with the AI provider failed.");
+    expect(shown).not.toContain(PROVIDER_HOST);
+    expect(shown).not.toContain(PROVIDER_REQUEST_ID);
+  });
+});

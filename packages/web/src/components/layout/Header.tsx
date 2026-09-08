@@ -1,7 +1,9 @@
 import { useState, useEffect, type ComponentType } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Bell, Search, Command, Moon, Sun, Monitor } from "lucide-react";
+import { ArrowRight, Bell, Search, Command, Moon, Sun, Monitor } from "lucide-react";
 import { useTheme, type Theme } from "@/contexts/ThemeContext";
+import { useOrg } from "@/contexts/OrgContext";
+import { visibleCommandPaletteNavItems } from "@/lib/nav-items";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -42,6 +44,9 @@ function CommandPalette({
   onOpenChange: (open: boolean) => void;
   onNavigate: (path: string) => void;
 }) {
+  const { currentRole } = useOrg();
+  const navItems = visibleCommandPaletteNavItems(currentRole);
+
   const runCommand = (callback: () => void) => {
     onOpenChange(false);
     callback();
@@ -56,7 +61,7 @@ function CommandPalette({
         </DialogHeader>
         <CommandPrimitive className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:size-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:size-5">
           <CommandInput placeholder="Type a command or search..." />
-          <CommandList>
+          <CommandList className="max-h-96">
             <CommandEmpty>No results found.</CommandEmpty>
             <CommandGroup heading="Quick Actions">
               <CommandItem onSelect={() => runCommand(() => onNavigate(AppRoutes.events.root))}>
@@ -74,24 +79,17 @@ function CommandPalette({
             </CommandGroup>
             <CommandSeparator />
             <CommandGroup heading="Navigation">
-              <CommandItem onSelect={() => runCommand(() => onNavigate(AppRoutes.dashboard))}>
-                Dashboard
-              </CommandItem>
-              <CommandItem onSelect={() => runCommand(() => onNavigate(AppRoutes.events.root))}>
-                Events
-              </CommandItem>
-              <CommandItem onSelect={() => runCommand(() => onNavigate(AppRoutes.projects.root))}>
-                Projects
-              </CommandItem>
-              <CommandItem onSelect={() => runCommand(() => onNavigate(AppRoutes.integrations.root))}>
-                Integrations
-              </CommandItem>
-              <CommandItem onSelect={() => runCommand(() => onNavigate(AppRoutes.members.root))}>
-                Members
-              </CommandItem>
-              <CommandItem onSelect={() => runCommand(() => onNavigate(AppRoutes.settings.root))}>
-                Settings
-              </CommandItem>
+              {navItems.map((item) => (
+                <CommandItem
+                  key={item.href}
+                  value={item.title}
+                  onSelect={() => runCommand(() => onNavigate(item.href))}
+                >
+                  <item.icon className="size-4" />
+                  <span>{item.title}</span>
+                  <ArrowRight className="ml-auto size-4" />
+                </CommandItem>
+              ))}
             </CommandGroup>
           </CommandList>
         </CommandPrimitive>

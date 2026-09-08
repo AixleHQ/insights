@@ -165,8 +165,22 @@ function App() {
                   <Route path="/integrations/:status" element={<Integrations />} />
                   {/* /members — top-level members routes */}
                   <Route path={AppRoutes.members.root} element={<Members />} />
-                  <Route path={AppRoutes.members.invite} element={<TeamInvite />} />
-                  <Route path={AppRoutes.members.invitations} element={<InvitationsManagement />} />
+                  <Route
+                    path={AppRoutes.members.invite}
+                    element={
+                      <ProtectedRoute requireRoles={["owner"]}>
+                        <TeamInvite />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path={AppRoutes.members.invitations}
+                    element={
+                      <ProtectedRoute requireRoles={["owner"]}>
+                        <InvitationsManagement />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route path="/members/:id" element={<MemberProfile />} />
                   {/* /team/* redirects to /members/* for backwards compatibility */}
                   <Route path="/team" element={<Navigate to={AppRoutes.members.root} replace />} />

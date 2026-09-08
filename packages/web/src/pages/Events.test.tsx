@@ -81,7 +81,7 @@ function renderPage(path = "/events") {
 
 async function openFilters() {
   const user = userEvent.setup();
-  await user.click(screen.getByRole("button", { name: /filters/i }));
+  await user.click(screen.getByRole("button", { name: /filter/i }));
   return user;
 }
 
@@ -179,7 +179,7 @@ describe("Events — server-side search (AIX-589)", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.type(screen.getByPlaceholderText("Search events..."), "github");
+    await user.type(screen.getByPlaceholderText("Search"), "github");
 
     // Debounce is 350ms — wait until the list query picks up the value.
     await vi.waitFor(
@@ -196,8 +196,8 @@ describe("Events — server-side search (AIX-589)", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.type(screen.getByPlaceholderText("Search events..."), "claude");
-    await user.click(screen.getByRole("button", { name: /^export$/i }));
+    await user.type(screen.getByPlaceholderText("Search"), "claude");
+    await user.click(screen.getByRole("button", { name: /^download$/i }));
 
     await vi.waitFor(() => {
       expect(exportEvents).toHaveBeenCalledWith(

@@ -68,6 +68,12 @@ module Ai
 
       def make_request(api_key:, endpoint:, body: nil, method: :post)
         uri = URI("#{BASE_URL}#{endpoint}")
+        # AIX-370 — the only place in the codebase that puts a credential in a URL. Gemini
+        # authenticates by query parameter rather than a header, so `uri` below carries the
+        # live API key. This is not a leak today: the URI is never logged, and handle_response
+        # substitutes fixed strings for 401/403/429 (see the comment there). It IS a risk site.
+        # Do not log `uri`, add it to an exception message, or attach it to a Rollbar payload —
+        # Rollbar's scrub_url only redacts inbound request URLs, not one we construct here.
         uri.query = "key=#{api_key}"
         http = Net::HTTP.new(uri.host, uri.port)
         http.use_ssl = true
@@ -96,6 +102,10 @@ module Ai
         case response.code.to_i
         when 200..299
           body
+        # Auth and rate-limit bodies may contain credential material. Discard them at
+        # the adapter boundary so future callers cannot accidentally expose them.
+        # Gemini maps 403 here as well as 401: this API returns 403 for a disabled or
+        # unauthorised key, which is an auth failure rather than an authorisation one.
         when 401, 403
           raise AuthenticationError.new("Invalid API key", status: response.code.to_i, provider: "gemini")
         when 429

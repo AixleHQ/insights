@@ -24,12 +24,12 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dualboot-partners/db90-rails.git",
+    "url": "git+https://github.com/AixleHQ/insights.git",
     "directory": "packages/tools/aixle-insights"
   },
-  "homepage": "https://github.com/dualboot-partners/db90-rails/tree/develop/packages/tools/aixle-insights#readme",
+  "homepage": "https://github.com/AixleHQ/insights/tree/develop/packages/tools/aixle-insights#readme",
   "bugs": {
-    "url": "https://github.com/dualboot-partners/db90-rails/issues"
+    "url": "https://github.com/AixleHQ/insights/issues"
   },
   "keywords": [
     "mcp",

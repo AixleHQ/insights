@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 ARG NODE_VERSION=24.13.0
-ARG NODE_REGISTRY=ghcr.io/dualboot-partners/db90-rails/node
-ARG NGINX_REGISTRY=ghcr.io/dualboot-partners/db90-rails/nginx
+ARG NODE_REGISTRY=ghcr.io/AixleHQ/insights/node
+ARG NGINX_REGISTRY=ghcr.io/AixleHQ/insights/nginx
 
 FROM ${NODE_REGISTRY}:${NODE_VERSION}-slim AS base
 

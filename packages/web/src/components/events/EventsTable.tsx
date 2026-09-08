@@ -53,6 +53,9 @@ interface EventsTableProps {
   className?: string;
 }
 
+const headClassName =
+  "text-muted-foreground type-caption font-medium";
+
 function formatCost(cost: unknown): string {
   if (cost === undefined || cost === null) return "-";
   const numCost = Number(cost);
@@ -78,15 +81,15 @@ export function EventsTable({
   showUserColumn = false,
   className,
 }: EventsTableProps) {
-  // Tool, Type, Risk, User (optional), Time, Cost, Tokens
-  const columnCount = showUserColumn ? 7 : 6;
+  // Tool, Type, Risk, User (optional), Project, Time, Tokens, Cost
+  const columnCount = showUserColumn ? 8 : 7;
 
   return (
     <div className={cn("overflow-x-auto", className)}>
-      <Table className="min-w-[700px]">
+      <Table className="min-w-[800px]">
         <TableHeader>
           <TableRow className="border-b border-border/50">
-            <TableHead className="w-[180px] text-muted-foreground type-caption font-medium uppercase tracking-wider">
+            <TableHead className={cn("w-[180px]", headClassName)}>
               <SortButton
                 field="tool_name"
                 currentField={sortField}
@@ -96,8 +99,8 @@ export function EventsTable({
                 Tool
               </SortButton>
             </TableHead>
-            <TableHead className="w-[120px] text-muted-foreground type-caption font-medium uppercase tracking-wider">Type</TableHead>
-            <TableHead className="w-[110px] text-muted-foreground type-caption font-medium uppercase tracking-wider">
+            <TableHead className={cn("w-[120px]", headClassName)}>Type</TableHead>
+            <TableHead className={cn("w-[110px]", headClassName)}>
               <SortButton
                 field="risk_level"
                 currentField={sortField}
@@ -108,9 +111,10 @@ export function EventsTable({
               </SortButton>
             </TableHead>
             {showUserColumn && (
-              <TableHead className="w-[220px] text-muted-foreground type-caption font-medium uppercase tracking-wider">User</TableHead>
+              <TableHead className={cn("w-[220px]", headClassName)}>User</TableHead>
             )}
-            <TableHead className="w-[100px] text-muted-foreground type-caption font-medium uppercase tracking-wider">
+            <TableHead className={cn("w-[140px]", headClassName)}>Project</TableHead>
+            <TableHead className={cn("w-[100px]", headClassName)}>
               <SortButton
                 field="created_at"
                 currentField={sortField}
@@ -120,7 +124,8 @@ export function EventsTable({
                 Time
               </SortButton>
             </TableHead>
-            <TableHead className="w-[90px] text-right text-muted-foreground type-caption font-medium uppercase tracking-wider">
+            <TableHead className={cn("w-[80px] text-right", headClassName)}>Tokens</TableHead>
+            <TableHead className={cn("w-[90px] text-right", headClassName)}>
               <SortButton
                 field="cost_usd"
                 currentField={sortField}
@@ -130,7 +135,6 @@ export function EventsTable({
                 Cost
               </SortButton>
             </TableHead>
-            <TableHead className="w-[80px] text-right text-muted-foreground type-caption font-medium uppercase tracking-wider">Tokens</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -194,19 +198,24 @@ export function EventsTable({
                   </TableCell>
                 )}
                 <TableCell>
+                  <span className="type-caption text-muted-foreground">
+                    {event.project?.name ?? "—"}
+                  </span>
+                </TableCell>
+                <TableCell>
                   <EventTimeCell
                     toolName={event.tool_name}
                     occurredAt={event.created_at}
                   />
                 </TableCell>
                 <TableCell className="text-right">
-                  <span className="font-mono-display type-label font-semibold tabular-nums text-foreground">
-                    {formatCost(event.cost_usd)}
+                  <span className="font-mono-display type-caption tabular-nums text-muted-foreground">
+                    {formatTokenCount(event.token_count)}
                   </span>
                 </TableCell>
                 <TableCell className="text-right">
-                  <span className="font-mono-display type-caption tabular-nums text-muted-foreground">
-                    {formatTokenCount(event.token_count)}
+                  <span className="font-mono-display type-label font-semibold tabular-nums text-foreground">
+                    {formatCost(event.cost_usd)}
                   </span>
                 </TableCell>
               </TableRow>

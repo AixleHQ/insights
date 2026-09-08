@@ -74,12 +74,14 @@ RSpec.describe "Rollbar redaction of the OpenRouter webhook token" do
   it "redacts webhook_token in the payload's request params" do
     observed = request_data[:params].inspect
 
+
     expect(request_data[:params][:webhook_token]).not_to eq(canary)
     expect(observed).not_to include(canary)
   end
 
   it "redacts the credential path segment from the payload's request.url" do
     observed = request_data[:url]
+
 
     expect(observed).not_to include(canary)
     expect(observed).not_to include(canary.first(8))

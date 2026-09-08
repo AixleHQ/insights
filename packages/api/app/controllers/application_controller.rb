@@ -20,7 +20,8 @@ class ApplicationController < ActionController::API
     @current_user = UserSyncService.sync_from_claims(claims)
     @jwt_claims = claims
   rescue ActiveRecord::RecordInvalid => e
-    Rails.logger.error "[Auth] User sync failed: #{e.message}"
+    invalid_attributes = e.record.errors.attribute_names.join(", ")
+    Rails.logger.error "[Auth] User sync failed: #{e.class.name} (invalid attributes: #{invalid_attributes})"
     render_unauthorized("User sync failed")
   end
 

@@ -8,6 +8,14 @@ export function formatDateLabel(dateStr: string, granularity: "month" | "day"): 
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+/**
+ * Recharts XAxis interval: force every label only for a short series (7d).
+ * Denser windows (30d) use preserveStartEnd so day labels do not collide.
+ */
+export function chartTickInterval(pointCount: number): 0 | "preserveStartEnd" {
+  return pointCount <= 7 ? 0 : "preserveStartEnd";
+}
+
 /** Mon-start week bucket → "Jul 6 - 12" or "Jun 29 - Jul 5" when the week crosses months. */
 export function formatWeekRange(dateStr: string): string {
   const start = new Date(dateStr + "T00:00:00");

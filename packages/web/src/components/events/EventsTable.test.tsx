@@ -59,3 +59,48 @@ describe("EventsTable Time column", () => {
     expect(screen.getByText("2h ago")).toBeInTheDocument();
   });
 });
+
+describe("EventsTable Figma layout", () => {
+  it("renders Project column and Tokens before Cost", () => {
+    render(<EventsTable events={[baseEvent]} />);
+
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+
+    const headers = screen.getAllByRole("columnheader").map((el) =>
+      el.textContent?.replace(/\s+/g, " ").trim()
+    );
+    // Sortable headers include an icon glyph; match by leading label.
+    expect(headers.map((h) => h?.replace(/[^A-Za-z ].*$/, "").trim())).toEqual([
+      "Tool",
+      "Type",
+      "Risk",
+      "Project",
+      "Time",
+      "Tokens",
+      "Cost",
+    ]);
+  });
+
+  it("inserts User between Risk and Project when showUserColumn", () => {
+    render(
+      <EventsTable
+        events={[{ ...baseEvent, user: { email: "a@b.com", name: "Ann" } }]}
+        showUserColumn
+      />
+    );
+
+    const headers = screen.getAllByRole("columnheader").map((el) =>
+      el.textContent?.replace(/\s+/g, " ").trim()
+    );
+    expect(headers.map((h) => h?.replace(/[^A-Za-z ].*$/, "").trim())).toEqual([
+      "Tool",
+      "Type",
+      "Risk",
+      "User",
+      "Project",
+      "Time",
+      "Tokens",
+      "Cost",
+    ]);
+  });
+});

@@ -146,6 +146,7 @@ RSpec.describe "Api::V1::OpenrouterTraces", type: :request do
 
         line = logged.find { |message| message.include?("[OpenrouterTraces]") }
 
+
         expect(line).to be_present
         expect(line).not_to include(canary_token)
         expect(line).not_to include(canary_token.first(8))

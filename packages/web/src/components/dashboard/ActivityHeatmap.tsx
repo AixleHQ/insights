@@ -24,8 +24,9 @@ interface ActivityData {
   models?: ModelBreakdown[];
 }
 
-interface ActivityHeatmapProps {
+export interface ActivityHeatmapProps {
   data: ActivityData[];
+  label?: string;
   className?: string;
   /** When "last_year", header shows "X events in the last year" (Figma Member dashboard). */
   summaryMode?: "default" | "last_year";
@@ -44,12 +45,12 @@ const TOOL_COLORS: Record<string, string> = {
 };
 
 function getIntensityClass(count: number, maxCount: number): string {
-  if (count === 0) return "bg-muted/30 dark:bg-muted/20";
+  if (count === 0) return "bg-muted/30";
   const intensity = count / maxCount;
-  if (intensity < 0.25) return "bg-primary/20 dark:bg-primary/20";
-  if (intensity < 0.5) return "bg-primary/45 dark:bg-primary/45";
-  if (intensity < 0.75) return "bg-primary/65 dark:bg-primary/65";
-  return "bg-primary/90 dark:bg-primary/90";
+  if (intensity < 0.25) return "bg-primary/20";
+  if (intensity < 0.5)  return "bg-primary/45";
+  if (intensity < 0.75) return "bg-primary/65";
+  return "bg-primary/90";
 }
 
 function formatDateLong(dateStr: string): string {
@@ -61,7 +62,6 @@ function formatDateLong(dateStr: string): string {
     year: "numeric",
   });
 }
-
 
 interface DayData {
   date: string;
@@ -157,7 +157,7 @@ function calculateWeeksToShow(containerWidth: number): number {
   return Math.max(12, Math.min(53, maxWeeks));
 }
 
-export function ActivityHeatmap({ data, className, summaryMode = "default" }: ActivityHeatmapProps) {
+export function ActivityHeatmap({ data, label, className, summaryMode = "default" }: ActivityHeatmapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [weeksToShow, setWeeksToShow] = useState(53);
   const [isCompact, setIsCompact] = useState(false);
@@ -272,13 +272,18 @@ export function ActivityHeatmap({ data, className, summaryMode = "default" }: Ac
             <span className="text-muted-foreground"> events in the last year</span>
           </p>
         ) : (
-          <div className="flex items-center gap-2">
-            <Activity className="size-4 sm:size-5 text-primary" />
-            <span className="font-semibold text-sm sm:text-base">Activity</span>
+          <div>
+            <div className="flex items-center gap-2">
+              <Activity className="size-4 sm:size-5 text-primary" />
+              <span className="font-semibold text-sm sm:text-base">Activity</span>
+            </div>
+            {label && (
+              <p className="type-caption text-muted-foreground mt-0.5">{label}</p>
+            )}
           </div>
         )}
         <div className="flex flex-wrap items-center gap-3 sm:gap-6 text-xs sm:text-sm text-muted-foreground">
-          {summaryMode === "default" && (
+          {summaryMode === "default" && !label && (
             <span>
               <span className="text-foreground font-medium">{formatCount(totalEvents)}</span> events
             </span>
@@ -383,11 +388,11 @@ export function ActivityHeatmap({ data, className, summaryMode = "default" }: Ac
         <div className="flex items-center justify-end gap-1.5 sm:gap-2 mt-3 sm:mt-4 text-[10px] sm:text-xs text-muted-foreground">
           <span>Less</span>
           <div className="flex gap-[2px] sm:gap-1">
-            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded bg-muted/30 dark:bg-muted/20" />
-            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded bg-primary/20 dark:bg-primary/20" />
-            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded bg-primary/45 dark:bg-primary/45" />
-            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded bg-primary/65 dark:bg-primary/65" />
-            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded bg-primary/90 dark:bg-primary/90" />
+            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded bg-muted/30" />
+            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded bg-primary/20" />
+            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded bg-primary/45" />
+            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded bg-primary/65" />
+            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[2px] sm:rounded bg-primary/90" />
           </div>
           <span>More</span>
         </div>

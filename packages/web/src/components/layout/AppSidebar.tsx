@@ -2,25 +2,18 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AppRoutes } from "@/lib/routes";
 import {
-  LayoutDashboard,
-  Activity,
-  FolderKanban,
-  Plug,
-  OctagonAlert,
   Settings,
-  Download,
   ChevronDown,
   LogOut,
   ChevronsUpDown,
   Plus,
   Check,
   User,
-  Users,
   Star,
-  type LucideIcon,
 } from "lucide-react";
+import { visibleSidebarNavItems } from "@/lib/nav-items";
 import { useAuth } from "@/contexts/AuthContext";
-import { useOrg, type MemberRole } from "@/contexts/OrgContext";
+import { useOrg } from "@/contexts/OrgContext";
 import { useImpersonation } from "@/contexts/ImpersonationContext";
 import { useCreateOrganization, useCurrentUser } from "@/hooks/useApi";
 import { useFavorites } from "@/hooks/useFavorites";
@@ -60,24 +53,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { roleIcons, roleColors } from "@/lib/role-display";
-
-type NavItem = {
-  title: string;
-  icon: LucideIcon;
-  href: string;
-  roles: MemberRole[];
-};
-
-const navItems: NavItem[] = [
-  { title: "Dashboard",    icon: LayoutDashboard, href: AppRoutes.dashboard,         roles: ["owner", "member", "viewer"] },
-  { title: "Events",       icon: Activity,        href: AppRoutes.events.root,       roles: ["owner", "member", "viewer"] },
-  { title: "Projects",     icon: FolderKanban,    href: AppRoutes.projects.root,     roles: ["owner", "member", "viewer"] },
-  { title: "Members",      icon: Users,           href: AppRoutes.members.root,      roles: ["owner"] },
-  { title: "Integrations", icon: Plug,            href: AppRoutes.integrations.root, roles: ["owner"] },
-  { title: "Alerts",       icon: OctagonAlert,    href: AppRoutes.alerts,            roles: ["owner"] },
-  { title: "Settings",     icon: Settings,        href: AppRoutes.settings.root,     roles: ["owner"] },
-  { title: "Exports",      icon: Download,        href: AppRoutes.exports,           roles: ["owner"] },
-];
 
 function getOrgInitials(name: string | undefined | null) {
   if (!name) return "??";
@@ -419,9 +394,7 @@ export function AppSidebar() {
   const { currentRole } = useOrg();
   const { favorites } = useFavorites();
 
-  const visibleNavItems = navItems.filter(
-    (item) => currentRole && item.roles.includes(currentRole),
-  );
+  const visibleNavItems = visibleSidebarNavItems(currentRole);
 
   const isActive = (href: string) => {
     if (href === "/") return location.pathname === "/";

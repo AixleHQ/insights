@@ -5633,9 +5633,165 @@ paths:
           $ref: '#/components/responses/Forbidden'
 
   # ============================================
+  # TELEMETRY
+  # ============================================
+  /api/v1/organizations/{organization_id}/telemetry/ingest:
+    post:
+      summary: Ingest a telemetry event
+      description: Stores the raw event and starts the telemetry ingestion workflow.
+      tags:
+        - Telemetry
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tool_name:
+                  type: string
+                event_type:
+                  type: string
+                model:
+                  type: string
+                tokens_in:
+                  type: integer
+                tokens_out:
+                  type: integer
+                cost_usd:
+                  type: number
+                duration_ms:
+                  type: integer
+                occurred_at:
+                  type: string
+                  format: date-time
+                project_id:
+                  type: string
+                  format: uuid
+                user_id:
+                  type: string
+                  format: uuid
+                prompt:
+                  type: string
+                response:
+                  type: string
+                system_prompt:
+                  type: string
+                messages:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      role:
+                        type: string
+                      content:
+                        type: string
+                metadata:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '202':
+          description: Event accepted for processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      accepted:
+                        type: boolean
+                        enum: [true]
+                      workflowId:
+                        type: string
+                        nullable: true
+                      rawEventKey:
+                        type: string
+                        nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: Telemetry processing failed without exposing internal exception detail
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
+                    enum: [Processing failed]
+
+  /api/v1/organizations/{organization_id}/telemetry/batch:
+    post:
+      summary: Ingest a batch of telemetry events
+      description: Accepts up to the configured batch limit and reports failures per event.
+      tags:
+        - Telemetry
+      parameters:
+        - $ref: '#/components/parameters/organization_id'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [events]
+              properties:
+                events:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: true
+      responses:
+        '202':
+          description: Batch processed; individual failures use a generic error message
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      accepted:
+                        type: integer
+                      failed:
+                        type: integer
+                      results:
+                        type: array
+                        items:
+                          type: object
+                          required: [index, accepted]
+                          properties:
+                            index:
+                              type: integer
+                            accepted:
+                              type: boolean
+                            workflow_id:
+                              type: string
+                              nullable: true
+                            error:
+                              type: string
+                              enum: [Processing failed]
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ============================================
   # AI GATEWAY
   # ============================================
-  /api/v1/organizations/{organization_id}/ai/{provider}/completions:
+  /api/v1/ai/{provider}/organizations/{organization_id}/completions:
     post:
       summary: AI completion
       description: |
@@ -5704,7 +5860,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /api/v1/organizations/{organization_id}/ai/{provider}/chat:
+  /api/v1/ai/{provider}/organizations/{organization_id}/chat:
     post:
       summary: AI chat
       description: |
@@ -5786,7 +5942,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /api/v1/organizations/{organization_id}/ai/{provider}/models:
+  /api/v1/ai/{provider}/organizations/{organization_id}/models:
     get:
       summary: List AI models
       description: |
@@ -6040,7 +6196,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
+                    enum: [Processing failed]
 
   /api/v1/integrations/mcp/exchange:
     post:

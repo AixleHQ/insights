@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import {
+  chartTickInterval,
   formatDateLabel,
   formatLocalDate,
   formatWeekRange,
@@ -150,5 +151,17 @@ describe("periodToDateRange", () => {
 
   it("returns an empty range for all_time", () => {
     expect(periodToDateRange({ type: "all_time" })).toEqual({});
+  });
+});
+
+describe("chartTickInterval", () => {
+  it("shows every tick for a 7-day series (AIX-442)", () => {
+    expect(chartTickInterval(7)).toBe(0);
+    expect(chartTickInterval(1)).toBe(0);
+  });
+
+  it("lets Recharts skip ticks for a 30-day series so labels do not collide (AIX-114)", () => {
+    expect(chartTickInterval(30)).toBe("preserveStartEnd");
+    expect(chartTickInterval(31)).toBe("preserveStartEnd");
   });
 });

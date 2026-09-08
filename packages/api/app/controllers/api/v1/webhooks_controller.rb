@@ -45,8 +45,8 @@ module Api
       rescue ActiveRecord::RecordNotFound
         render json: { error: "Connector not found" }, status: :not_found
       rescue StandardError => e
-        Rails.logger.error "[Webhooks] Processing failed: #{e.message}"
-        render json: { error: "Processing failed", message: e.message }, status: :unprocessable_content
+        Rails.logger.error "[Webhooks] Processing failed: #{e.class.name} #{e.message}"
+        render json: { error: "Processing failed" }, status: :unprocessable_content
       end
 
       private

@@ -73,6 +73,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import type { Invitation, InvitationStatus, MemberRole } from "@/lib/types";
 
 function formatDate(dateString: string): string {
@@ -111,20 +112,21 @@ function getStatusIcon(status: InvitationStatus) {
   }
 }
 
-function getStatusVariant(
-  status: InvitationStatus
-): "default" | "secondary" | "destructive" | "outline" {
+function getStatusBadgeProps(status: InvitationStatus): {
+  variant: "default" | "secondary" | "destructive" | "outline";
+  className?: string;
+} {
   switch (status) {
     case "pending":
-      return "default";
+      return { variant: "outline", className: "border-warning/40 bg-warning/10 text-warning" };
     case "accepted":
-      return "secondary";
+      return { variant: "outline", className: "border-success/40 bg-success/10 text-success" };
     case "revoked":
-      return "destructive";
+      return { variant: "destructive" };
     case "expired":
-      return "outline";
+      return { variant: "outline", className: "text-muted-foreground" };
     default:
-      return "outline";
+      return { variant: "outline" };
   }
 }
 
@@ -155,6 +157,7 @@ function InvitationRow({
   const [copied, setCopied] = useState(false);
   const isPending = invitation.status === "pending";
   const inviteUrl = `${window.location.origin}/invitations/${invitation.token}`;
+  const { variant: statusVariant, className: statusClass } = getStatusBadgeProps(invitation.status);
 
   const handleCopyLink = async () => {
     await navigator.clipboard.writeText(inviteUrl);
@@ -178,7 +181,7 @@ function InvitationRow({
         </Badge>
       </TableCell>
       <TableCell>
-        <Badge variant={getStatusVariant(invitation.status)} className="gap-1 capitalize">
+        <Badge variant={statusVariant} className={cn("gap-1 capitalize", statusClass)}>
           {getStatusIcon(invitation.status)}
           {invitation.status}
         </Badge>
@@ -217,7 +220,7 @@ function InvitationRow({
                       onClick={handleCopyLink}
                     >
                       {copied ? (
-                        <Check className="size-4 text-green-500" />
+                        <Check className="size-4 text-success" />
                       ) : (
                         <Copy className="size-4" />
                       )}

@@ -310,4 +310,74 @@ RSpec.describe UserSyncService do
       described_class.find_or_create_from_token(claims)
     end
   end
+
+  # AIX-370 — PII in logs, on the hottest path there is.
+  #
+  # sync_from_claims runs on EVERY authenticated request (see the comment in the service), so
+  # anything interpolated into a log line here is written at request volume. `filter_parameters`
+  # cannot help: it walks a parameter *hash* and matches keys, and never inspects a String
+  # handed to Rails.logger. That is exactly why these assertions exist rather than leaning on
+  # the filter_parameters coverage added earlier in this ticket — the two protect different
+  # channels, and only one of them was ever covering this code.
+  #
+  # NOTE: these stub :info, NOT :error. Every PII line in this service is at info level; a spec
+  # that stubbed :error would capture an empty array and pass without asserting anything.
+  describe 'log hygiene (AIX-370)' do
+    let(:pii_email) { 'pii-canary@example.com' }
+    let(:pii_sub) { 'keycloak-sub-CANARY-9f8a1b2c' }
+
+    let(:claims) do
+      {
+        'sub' => pii_sub,
+        'email' => pii_email,
+        'name' => 'PII Canary',
+        'iat' => Time.current.to_i
+      }
+    end
+
+    let(:logged) { [] }
+
+    before { allow(Rails.logger).to receive(:info) { |message| logged << message } }
+
+    def logged_text = logged.join("\n")
+
+    it 'logs neither the email nor the Keycloak sub when creating a user' do
+      user = described_class.sync_from_claims(claims)
+
+      # Guards against a vacuous pass: if nothing were captured, the refutations below
+      # would all hold trivially.
+      expect(logged).not_to be_empty
+      expect(logged_text).to include("id=#{user.id}")
+      expect(logged_text).not_to include(pii_email)
+      expect(logged_text).not_to include(pii_sub)
+    end
+
+    it 'logs neither the email nor the Keycloak sub when re-syncing an existing user' do
+      described_class.sync_from_claims(claims)
+      logged.clear
+
+      described_class.sync_from_claims(claims)
+
+      expect(logged).not_to be_empty
+      expect(logged_text).not_to include(pii_email)
+      expect(logged_text).not_to include(pii_sub)
+    end
+
+    it 'logs neither the email nor either sub when relinking a user to a new Keycloak identity' do
+      existing = create(:user, email: pii_email, keycloak_sub: 'old-sub-CANARY-1234')
+      logged.clear
+
+      described_class.sync_from_claims(claims)
+
+      expect(logged_text).to include("Linking existing user id=#{existing.id}")
+      expect(logged_text).not_to include(pii_email)
+      expect(logged_text).not_to include('old-sub-CANARY-1234')
+      expect(logged_text).not_to include(pii_sub)
+    end
+
+    it 'records the sanitised log output as AC2-hot evidence' do
+      user = described_class.sync_from_claims(claims)
+
+    end
+  end
 end

@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 ARG RUBY_VERSION=3.4.8
-ARG RUBY_REGISTRY=ghcr.io/dualboot-partners/db90-rails/ruby
+ARG RUBY_REGISTRY=ghcr.io/AixleHQ/insights/ruby
 FROM ${RUBY_REGISTRY}:${RUBY_VERSION}-slim AS base
 
 WORKDIR /app

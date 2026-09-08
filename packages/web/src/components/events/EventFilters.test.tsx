@@ -37,12 +37,12 @@ describe("EventFilters", () => {
   describe("Initial Render", () => {
     it("renders the search input", () => {
       renderFilters();
-      expect(screen.getByPlaceholderText("Search events...")).toBeInTheDocument();
+      expect(screen.getByPlaceholderText("Search")).toBeInTheDocument();
     });
 
-    it("renders the Filters button", () => {
+    it("renders the Filter button", () => {
       renderFilters();
-      expect(screen.getByRole("button", { name: /filters/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /filter/i })).toBeInTheDocument();
     });
 
     it("does not show active filters section when no filters", () => {
@@ -52,7 +52,12 @@ describe("EventFilters", () => {
 
     it("renders with empty tools array", () => {
       renderFilters({}, []);
-      expect(screen.getByRole("button", { name: /filters/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /filter/i })).toBeInTheDocument();
+    });
+
+    it("shows ⌘K shortcut hint on empty search", () => {
+      renderFilters();
+      expect(screen.getByText("⌘K")).toBeInTheDocument();
     });
   });
 
@@ -61,7 +66,7 @@ describe("EventFilters", () => {
       const user = userEvent.setup();
       renderFilters();
 
-      const searchInput = screen.getByPlaceholderText("Search events...");
+      const searchInput = screen.getByPlaceholderText("Search");
       await user.type(searchInput, "a");
 
       expect(mockOnFiltersChange).toHaveBeenCalled();
@@ -72,7 +77,7 @@ describe("EventFilters", () => {
     it("displays the current search value", () => {
       renderFilters({ search: "existing search" });
 
-      const searchInput = screen.getByPlaceholderText("Search events...") as HTMLInputElement;
+      const searchInput = screen.getByPlaceholderText("Search") as HTMLInputElement;
       expect(searchInput.value).toBe("existing search");
     });
 
@@ -194,7 +199,7 @@ describe("EventFilters", () => {
       const user = userEvent.setup();
       renderFilters({ tools: ["claude_code"], riskLevels: ["high"] });
 
-      const searchInput = screen.getByPlaceholderText("Search events...");
+      const searchInput = screen.getByPlaceholderText("Search");
       await user.type(searchInput, "x");
 
       const lastCall = mockOnFiltersChange.mock.calls[mockOnFiltersChange.mock.calls.length - 1][0];
@@ -240,7 +245,7 @@ describe("EventFilters", () => {
   // through the filter UI, so no data source is silently unfilterable.
   describe("Enum coverage guards", () => {
     const openSubmenu = async (user: ReturnType<typeof userEvent.setup>, name: RegExp) => {
-      await user.click(screen.getByRole("button", { name: /filters/i }));
+      await user.click(screen.getByRole("button", { name: /filter/i }));
       await user.click(await screen.findByRole("menuitem", { name }));
     };
 

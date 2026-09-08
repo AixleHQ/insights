@@ -75,7 +75,10 @@ class JwtAuth
         return unauthorized_response("Impersonation token has been revoked")
       end
 
-      Rails.logger.info("[JwtAuth] Impersonation token validated for #{impersonation_claims['email']}")
+      # AIX-370: the impersonated user's email is PII and is logged on every request for
+      # the whole session. The impersonator id preserves the security-relevant signal — that
+      # an admin acted as someone else — without naming either party.
+      Rails.logger.info("[JwtAuth] Impersonation token validated (impersonator_id=#{impersonation_claims['impersonator_id']})")
       return {
         "jwt.claims" => impersonation_claims,
         "jwt.token" => token,
@@ -94,7 +97,11 @@ class JwtAuth
     end
 
     claims = validate_token(token)
-    Rails.logger.info("[JwtAuth] Token validated for #{claims['email']}")
+    # AIX-370: deliberately logs nothing on the success path. This runs on every
+    # authenticated request, and the line here used to write the user's email — PII at
+    # request volume, in a channel filter_parameters cannot scrub (it matches keys in a
+    # parameter hash, never an interpolated log string). Nothing consumed the line: no
+    # dashboard, alert or runbook referenced it, and Rails already logs the request itself.
     { "jwt.claims" => claims, "jwt.token" => token }
   rescue TokenExpiredError
     Rails.logger.warn("[JwtAuth] Token expired #{token_ref(token)}")
@@ -183,6 +190,16 @@ class JwtAuth
   # Correlation reference from the UNVERIFIED token claims — logged on auth failure so a
   # Rails-side rejection can be cross-referenced against Keycloak's Events log. Decodes
   # without verifying and never logs the raw token; returns "" if the token can't be read.
+  #
+  # AIX-370 kept this deliberately, and the distinction is worth stating because it looks
+  # inconsistent at a glance with the same ticket adding `keycloak_sub` to filter_parameters:
+  #   - This runs on FAILURE paths only, not per request, so it is not written at request volume.
+  #   - It carries no email or name — sub/sid/jti are opaque, and sid/jti are what make a
+  #     rejection traceable to a specific Keycloak session and token.
+  #   - Dropping it would leave auth failures uninvestigable, which is the observability the
+  #     ticket is meant to preserve, not destroy.
+  # If this is ever moved onto a success path, it becomes per-request identity logging and the
+  # trade-off above no longer holds.
   def token_ref(token)
     return "" if token.nil?
 

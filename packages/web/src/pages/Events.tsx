@@ -281,9 +281,14 @@ export function Events() {
                 Assign {bulkAssign.count} selected
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isFetching}>
-              <RefreshCw className={`mr-2 size-4 ${isFetching ? "animate-spin" : ""}`} />
-              Refresh
+            <Button
+              variant="outline"
+              size="icon-sm"
+              onClick={handleRefresh}
+              disabled={isFetching}
+              aria-label="Refresh"
+            >
+              <RefreshCw className={`size-3.5 ${isFetching ? "animate-spin" : ""}`} />
             </Button>
             <Button variant="outline" size="sm" onClick={handleExport} disabled={isExporting}>
               {isExporting ? (
@@ -291,7 +296,7 @@ export function Events() {
               ) : (
                 <Download className="mr-2 size-4" />
               )}
-              {isExporting ? "Exporting…" : "Export"}
+              {isExporting ? "Downloading…" : "Download"}
             </Button>
           </div>
         }

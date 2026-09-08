@@ -21,13 +21,13 @@ module Api
 
         render json: { data: format_completion_response(result) }
       rescue Ai::RateLimitError => e
-        render json: { error: "Rate Limited", message: e.message }, status: :too_many_requests
+        render_ai_error(e, label: "Rate Limited", message: "Too many requests to the AI provider. Please try again later.", status: :too_many_requests)
       rescue Ai::AuthenticationError => e
-        render json: { error: "Authentication Failed", message: e.message }, status: :unauthorized
+        render_ai_error(e, label: "Authentication Failed", message: "Authentication with the AI provider failed.", status: :unauthorized)
       rescue Ai::InvalidRequestError => e
-        render json: { error: "Invalid Request", message: e.message }, status: :bad_request
+        render_ai_error(e, label: "Invalid Request", message: "The AI provider rejected the request.", status: :bad_request)
       rescue Ai::ApiError => e
-        render json: { error: "API Error", message: e.message }, status: :bad_gateway
+        render_ai_error(e, label: "API Error", message: "The AI provider is currently unavailable. Please try again later.", status: :bad_gateway)
       end
 
       # POST /api/v1/organizations/:organization_id/ai/:provider/chat
@@ -44,13 +44,13 @@ module Api
 
         render json: { data: format_chat_response(result) }
       rescue Ai::RateLimitError => e
-        render json: { error: "Rate Limited", message: e.message }, status: :too_many_requests
+        render_ai_error(e, label: "Rate Limited", message: "Too many requests to the AI provider. Please try again later.", status: :too_many_requests)
       rescue Ai::AuthenticationError => e
-        render json: { error: "Authentication Failed", message: e.message }, status: :unauthorized
+        render_ai_error(e, label: "Authentication Failed", message: "Authentication with the AI provider failed.", status: :unauthorized)
       rescue Ai::InvalidRequestError => e
-        render json: { error: "Invalid Request", message: e.message }, status: :bad_request
+        render_ai_error(e, label: "Invalid Request", message: "The AI provider rejected the request.", status: :bad_request)
       rescue Ai::ApiError => e
-        render json: { error: "API Error", message: e.message }, status: :bad_gateway
+        render_ai_error(e, label: "API Error", message: "The AI provider is currently unavailable. Please try again later.", status: :bad_gateway)
       end
 
       # GET /api/v1/organizations/:organization_id/ai/:provider/models
@@ -64,12 +64,21 @@ module Api
 
         render json: { data: models }
       rescue Ai::AuthenticationError => e
-        render json: { error: "Authentication Failed", message: e.message }, status: :unauthorized
+        render_ai_error(e, label: "Authentication Failed", message: "Authentication with the AI provider failed.", status: :unauthorized)
       rescue Ai::ApiError => e
-        render json: { error: "API Error", message: e.message }, status: :bad_gateway
+        render_ai_error(e, label: "API Error", message: "The AI provider is currently unavailable. Please try again later.", status: :bad_gateway)
       end
 
       private
+
+      def render_ai_error(error, label:, message:, status:)
+        # Provider messages are untrusted and may contain credentials, prompt content, or PII.
+        Rails.logger.error(
+          "[AiGateway] #{label}: provider=#{error.provider} status=#{error.status} " \
+          "class=#{error.class.name}"
+        )
+        render json: { error: label, message: message }, status: status
+      end
 
       # Providers that are connected for usage polling only — chat/completion
       # via the gateway is not permitted for these, regardless of authorization.
@@ -93,7 +102,7 @@ module Api
           }, status: :bad_request
         end
 
-        # TODO (R2 AIX-347): With multiple connectors per provider, selecting by connector_id would
+        # TODO (AIX-462): With multiple connectors per provider, selecting by connector_id would
         # allow callers to target a specific key. For now, use the oldest active connector.
         @connector = current_organization.organization_connectors
                                          .where(connector_type: provider, is_active: true)

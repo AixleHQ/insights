@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Search, X, ListFilter } from "lucide-react";
+import { Filter, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SearchBar } from "@/components/ui/search-bar";
 import {
   Dialog,
   DialogContent,
@@ -286,43 +287,33 @@ export function EventFilters({
         {leading}
         {leading && <div className="hidden sm:block h-5 w-px bg-border" />}
         {/* Search input */}
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search events..."
-            value={filters.search || ""}
-            onChange={(e) =>
-              onFiltersChange({ ...filters, search: e.target.value || undefined })
-            }
-            className="!h-8 pl-8 pr-8 text-sm"
-          />
-          {filters.search && (
-            <button
-              onClick={() => onFiltersChange({ ...filters, search: undefined })}
-              aria-label="Clear search"
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground hover:bg-muted"
-            >
-              <X className="size-3.5" />
-            </button>
-          )}
-        </div>
+        <SearchBar
+          placeholder="Search"
+          value={filters.search || ""}
+          onChange={(value) =>
+            onFiltersChange({ ...filters, search: value || undefined })
+          }
+          shortcutHint="⌘K"
+          className="w-full sm:w-64 [&_input]:!h-8 [&_input]:text-sm"
+        />
 
+        {/* Right actions: Filter funnel + trailing (Refresh / Download) */}
+        <div className="flex items-center gap-2 sm:ml-auto">
         {/* Filter dropdown */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="outline"
-              size="sm"
+              size="icon-sm"
+              aria-label="Filter"
               className={cn(
-                "h-8 gap-2 font-normal",
                 activeFilterCount > 0 && "border-primary/50 bg-primary/5"
               )}
             >
-              <ListFilter className="size-3.5" />
-              Filters
+              <Filter className="size-3.5" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-48" align="start">
+          <DropdownMenuContent className="w-48" align="end">
             {/* Tool */}
             {tools.length > 0 && (
               <DropdownMenuSub>
@@ -560,11 +551,8 @@ export function EventFilters({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {trailing && (
-          <div className="sm:ml-auto flex items-center gap-2">
-            {trailing}
-          </div>
-        )}
+        {trailing}
+        </div>
       </div>
 
       {/* Active filter chips */}

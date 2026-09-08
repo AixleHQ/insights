@@ -22,7 +22,6 @@ class UserSyncService
       raise ArgumentError, "Missing sub claim" if keycloak_sub.blank?
 
       email = claims["email"]
-      Rails.logger.info "[UserSyncService] sync_from_claims: sub=#{keycloak_sub}, email=#{email}"
 
       user = find_or_initialize_user_with_email(keycloak_sub, email)
       # Domain auto-join must run only for brand-new users. sync_from_claims runs on every
@@ -37,8 +36,13 @@ class UserSyncService
       update_user_attributes(user, claims)
       user.save!
 
-      Rails.logger.info "[UserSyncService] User synced: id=#{user.id}, email=#{user.email}, keycloak_sub=#{user.keycloak_sub}"
-      Rails.logger.info "[UserSyncService] User orgs: #{user.organization_memberships.count}, events: #{ToolEvent.where(user_id: user.id).count}"
+      # AIX-370: sync_from_claims runs on EVERY authenticated request, so anything logged
+      # here is written at request volume. It previously emitted the email, the Keycloak sub
+      # and our user id on one line — a complete identity join key, unredactable because
+      # filter_parameters only scrubs parameter hashes, never an interpolated log string.
+      # Only the internal user id survives: it is a pseudonymous key, not an external
+      # identity, and without it the line carries no diagnostic value at all.
+      Rails.logger.info "[UserSyncService] User synced: id=#{user.id}"
 
       if is_new_user
         auto_assign_organization(user, claims)
@@ -69,7 +73,9 @@ class UserSyncService
         if existing
           # Update the keycloak_sub to the real OAuth value
           # This links the seeded/pending user to the actual OAuth identity
-          Rails.logger.info "[UserSyncService] Linking existing user #{email} (old sub: #{existing.keycloak_sub}) to new sub: #{keycloak_sub}"
+          # AIX-370: logged without the email or either keycloak_sub — together those made
+          # this single line a complete identity-migration record.
+          Rails.logger.info "[UserSyncService] Linking existing user id=#{existing.id} to a new keycloak_sub"
           existing.update!(keycloak_sub: keycloak_sub)
           return existing
         end
@@ -124,7 +130,7 @@ class UserSyncService
           rescue ActiveRecord::RecordNotUnique
             # Concurrent sync won the race; membership already exists
           end
-          Rails.logger.info "[UserSyncService] Auto-assigned #{user.email} to org #{org_slug} (legacy mapping)"
+          Rails.logger.info "[UserSyncService] Auto-assigned user id=#{user.id} to org #{org_slug} (legacy mapping)"
         end
       end
 
@@ -140,7 +146,7 @@ class UserSyncService
           rescue ActiveRecord::RecordNotUnique
             # Concurrent sync won the race; membership already exists
           end
-          Rails.logger.info "[UserSyncService] Auto-assigned #{user.email} to org #{setting.organization.slug} (domain setting)"
+          Rails.logger.info "[UserSyncService] Auto-assigned user id=#{user.id} to org #{setting.organization.slug} (domain setting)"
         end
     end
 
@@ -167,7 +173,7 @@ class UserSyncService
             rescue ActiveRecord::RecordNotUnique
               # Concurrent sync won the race; membership already exists
             end
-            Rails.logger.info "[UserSyncService] Auto-assigned #{user.email} to project #{setting.project.name} (domain setting)"
+            Rails.logger.info "[UserSyncService] Auto-assigned user id=#{user.id} to project #{setting.project.name} (domain setting)"
           end
       end
     end
