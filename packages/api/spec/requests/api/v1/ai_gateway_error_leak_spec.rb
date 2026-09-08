@@ -137,7 +137,6 @@ RSpec.describe "Api::V1::AiGateway upstream error leakage", type: :request do
 
               verdict = "PASS — provider detail absent from response and log; " \
                         "safe provider/status/class metadata retained"
-
             end
           end
         end
@@ -164,7 +163,6 @@ RSpec.describe "Api::V1::AiGateway upstream error leakage", type: :request do
         # connector's own stored token — it must reach neither sink.
         expect(gateway_log).not_to include(CANARY_KEY)
         expect(response.body).not_to include(CANARY_KEY)
-
       end
     end
   end

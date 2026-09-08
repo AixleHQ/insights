@@ -522,7 +522,6 @@ RSpec.describe JwtAuth do
         env = Rack::MockRequest.env_for('/api/v1/users', 'HTTP_AUTHORIZATION' => "Bearer #{token}")
 
         fresh_middleware.call(env)
-
       end
     end
 

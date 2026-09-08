@@ -54,6 +54,5 @@ RSpec.describe "ApplicationController#authenticate_user! error handling", type: 
     expect(auth_log).not_to include("real-path-pii@example.com")
     expect(auth_log).not_to include("Real Path Person")
     expect(response.body).not_to include("real-path-pii@example.com")
-
   end
 end

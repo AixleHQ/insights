@@ -377,7 +377,6 @@ RSpec.describe UserSyncService do
 
     it 'records the sanitised log output as AC2-hot evidence' do
       user = described_class.sync_from_claims(claims)
-
     end
   end
 end

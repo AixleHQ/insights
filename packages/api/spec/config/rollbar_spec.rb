@@ -100,7 +100,6 @@ RSpec.describe "Rollbar scrub configuration" do
       expect(headers.fetch("X-Request-Id")).to eq(safe_request_id)
       expect(request_data.to_s).not_to include(authorization)
       expect(request_data.to_s).not_to include(api_key)
-
     end
   end
 end
