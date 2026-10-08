@@ -2,8 +2,8 @@ source "https://rubygems.org"
 
 ruby "3.4.8"
 
-gem "rails", "~> 8.1.2"
-gem "pg", "~> 1.1"
+gem "rails", "~> 8.1.4"
+gem "pg", "~> 1.7"
 gem "puma", ">= 5.0"
 gem "tzinfo-data", platforms: %i[ windows jruby ]
 
@@ -75,4 +75,4 @@ group :test do
 end
 gem "csv"
 
-gem "temporalio", "~> 1.4"
+gem "temporalio", "~> 1.9"
