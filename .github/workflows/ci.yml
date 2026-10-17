@@ -42,7 +42,7 @@ jobs:
       DATABASE_PASSWORD: postgres
       REDIS_URL: redis://localhost:6379/1
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install system libraries (pg client)
         run: sudo apt-get update -qq && sudo apt-get install --no-install-recommends -y libpq-dev postgresql-client
       - uses: ruby/setup-ruby@v1
@@ -61,7 +61,7 @@ jobs:
     name: API Lint (Rubocop)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: 3.4.8
@@ -75,7 +75,7 @@ jobs:
     name: API Security (Brakeman)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: 3.4.8
@@ -91,7 +91,7 @@ jobs:
     name: Web Tests (Vitest)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: 24.13.0
@@ -108,7 +108,7 @@ jobs:
     name: Web Lint (ESLint)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: 24.13.0
@@ -125,7 +125,7 @@ jobs:
     name: Web Typecheck (TypeScript)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: 24.13.0
@@ -144,7 +144,7 @@ jobs:
     name: "@aixle/insights (build + test)"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
@@ -164,7 +164,7 @@ jobs:
     name: "@aixle/insights (Windows install smoke — better-sqlite3)"
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
